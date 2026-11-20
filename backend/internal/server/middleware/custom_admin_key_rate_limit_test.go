@@ -20,7 +20,7 @@ func TestScopedAdminKeyPanelRateLimitAuthenticatedRead(t *testing.T) {
 	settings := newPanelRateLimitTestService(t, `{"enabled":true,"user_rpm":1,"heavy_rpm":1,"exempt_admin":true,"public_ip_rpm":0}`)
 	settings.SetScopedAdminKeyRepository(&adminAuthKeyRepo{})
 	key, item, err := settings.CreateScopedAdminKey(context.Background(), service.ScopedAdminKeyInput{
-		Name: "读取用户", Enabled: true, Policy: adminaccess.Policy{GlobalPermissions: []string{"users.read"}},
+		Name: "读取代理", Enabled: true, Policy: adminaccess.Policy{GlobalPermissions: []string{"proxies.read"}},
 	}, 9)
 	require.NoError(t, err)
 	users := service.NewUserService(&stubUserRepo{getByID: func(context.Context, int64) (*service.User, error) {
@@ -30,9 +30,9 @@ func TestScopedAdminKeyPanelRateLimitAuthenticatedRead(t *testing.T) {
 	p := &PanelRateLimiter{limiter: allower, settingService: settings}
 	r := gin.New()
 	r.Use(gin.HandlerFunc(NewAdminAuthMiddleware(nil, users, settings, nil)), p.Global())
-	r.GET("/api/v1/admin/users", func(c *gin.Context) { c.Status(http.StatusNoContent) })
+	r.GET("/api/v1/admin/proxies", func(c *gin.Context) { c.Status(http.StatusNoContent) })
 	request := func() *httptest.ResponseRecorder {
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/users", nil)
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/admin/proxies", nil)
 		req.Header.Set("x-api-key", key)
 		w := httptest.NewRecorder()
 		r.ServeHTTP(w, req)
@@ -95,7 +95,7 @@ func TestScopedAdminKeyPanelRateLimitAuthenticatedSensitiveWrite(t *testing.T) {
 			settings := newPanelRateLimitTestService(t, tc.settings)
 			settings.SetScopedAdminKeyRepository(&adminAuthKeyRepo{})
 			key, _, err := settings.CreateScopedAdminKey(context.Background(), service.ScopedAdminKeyInput{
-				Name: "调整余额", Enabled: true, Policy: adminaccess.Policy{GlobalPermissions: []string{"users.balance.write"}},
+				Name: "修改告警", Enabled: true, Policy: adminaccess.Policy{GlobalPermissions: []string{"ops.alerts.write"}},
 			}, 9)
 			require.NoError(t, err)
 			users := service.NewUserService(&stubUserRepo{getByID: func(context.Context, int64) (*service.User, error) {
@@ -104,9 +104,9 @@ func TestScopedAdminKeyPanelRateLimitAuthenticatedSensitiveWrite(t *testing.T) {
 			p := &PanelRateLimiter{limiter: &fakePanelAllower{err: tc.redisErr}, settingService: settings}
 			r := gin.New()
 			r.Use(gin.HandlerFunc(NewAdminAuthMiddleware(nil, users, settings, nil)), p.Global())
-			r.POST("/api/v1/admin/users/:id/balance", func(c *gin.Context) { c.Status(http.StatusNoContent) })
+			r.POST("/api/v1/admin/ops/alert-rules", func(c *gin.Context) { c.Status(http.StatusNoContent) })
 			for _, want := range tc.wantCodes {
-				req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/users/12/balance", nil)
+				req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/ops/alert-rules", nil)
 				req.Header.Set("x-api-key", key)
 				w := httptest.NewRecorder()
 				r.ServeHTTP(w, req)

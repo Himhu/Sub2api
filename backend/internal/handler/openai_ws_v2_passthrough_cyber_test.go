@@ -42,7 +42,7 @@ func newOpenAIWSPassthroughHandlerHarness(t *testing.T, upstreamURL string, sett
 		}
 	}
 	moderationRepo := &contentModerationHandlerTestRepo{}
-	moderationSvc := service.NewContentModerationService(settingRepo, moderationRepo, nil, nil, nil, nil, nil, nil)
+	moderationSvc := service.NewContentModerationService(settingRepo, moderationRepo, nil, nil, nil, nil, nil)
 	settingSvc := service.NewSettingService(settingRepo, nil)
 
 	groupID := int64(4301)
@@ -76,11 +76,11 @@ func newOpenAIWSPassthroughHandlerHarness(t *testing.T, upstreamURL string, sett
 
 	accountRepo := &openAIWSUsageHandlerAccountRepoStub{account: account}
 	usageRepo := &openAIWSUsageHandlerUsageLogRepoStub{created: make(chan *service.UsageLog, 2)}
-	billingCacheSvc := service.NewBillingCacheService(nil, nil, nil, nil, nil, nil, cfg, nil)
+	billingCacheSvc := service.NewBillingCacheService(nil, nil, nil, nil, nil, cfg, nil)
 	gatewaySvc := service.NewOpenAIGatewayService(
-		accountRepo, usageRepo, nil, nil, nil, nil, gatewayCache, cfg, nil, nil,
+		accountRepo, usageRepo, nil, nil, nil, gatewayCache, cfg, nil, nil,
 		service.NewBillingService(cfg, nil), nil, billingCacheSvc, nil, &service.DeferredService{},
-		nil, nil, nil, nil, nil, settingSvc, nil,
+		nil, nil, nil, nil, settingSvc, nil,
 	)
 	concurrencyCache := &concurrencyCacheMock{
 		acquireUserSlotFn:    func(context.Context, int64, int, string) (bool, error) { return true, nil },

@@ -47,13 +47,12 @@ func reserveInflightBalance(
 	billing *service.BillingCacheService,
 	estimator inflightReservationEstimator,
 	apiKey *service.APIKey,
-	subscription *service.UserSubscription,
 	req service.InflightEstimateRequest,
 ) (func(), error) {
 	if c == nil || c.Request == nil {
 		return inflightNoop, nil
 	}
-	ctx, done, err := reserveInflightBalanceCtx(c.Request.Context(), billing, estimator, apiKey, subscription, req)
+	ctx, done, err := reserveInflightBalanceCtx(c.Request.Context(), billing, estimator, apiKey, req)
 	if err != nil {
 		return inflightNoop, err
 	}
@@ -68,30 +67,12 @@ func reserveInflightBalanceCtx(
 	billing *service.BillingCacheService,
 	estimator inflightReservationEstimator,
 	apiKey *service.APIKey,
-	subscription *service.UserSubscription,
 	req service.InflightEstimateRequest,
 ) (context.Context, func(), error) {
-	if billing == nil || estimator == nil || apiKey == nil || apiKey.User == nil || !billing.InflightReservationEnabled() {
-		return ctx, inflightNoop, nil
-	}
-	if apiKey.Group != nil && apiKey.Group.IsSubscriptionType() && subscription != nil {
-		return ctx, inflightNoop, nil
-	}
-	estimate, priced := estimator.EstimateInflightReservation(ctx, apiKey, req)
-	if !priced && billing.InflightReservationFailClosedOnUnpriced() {
-		return ctx, inflightNoop, service.ErrInsufficientBalance
-	}
-	if estimate <= 0 {
-		return ctx, inflightNoop, nil
-	}
-	res, err := billing.ReserveInflight(ctx, apiKey.User, apiKey.Group, subscription, estimate)
-	if err != nil {
-		return ctx, inflightNoop, err
-	}
-	if res == nil {
-		return ctx, inflightNoop, nil
-	}
-	return service.WithInflightReservation(ctx, res), res.HandlerDone, nil
+	// 单管理员自用版不再以余额作为准入条件：余额维度的在途预留恒为 no-op，
+	// 既不估算费用也不会拒绝请求。
+	_, _, _, _ = billing, estimator, apiKey, req
+	return ctx, inflightNoop, nil
 }
 
 // grokMediaInflightEstimate 媒体生成请求的估算输入；状态/内容查询返回空模型（不预留：

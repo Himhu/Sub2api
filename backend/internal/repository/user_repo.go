@@ -11,15 +11,11 @@ import (
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/ent/apikey"
-	"github.com/Wei-Shaw/sub2api/ent/authidentity"
-	"github.com/Wei-Shaw/sub2api/ent/authidentitychannel"
 	dbgroup "github.com/Wei-Shaw/sub2api/ent/group"
-	"github.com/Wei-Shaw/sub2api/ent/identityadoptiondecision"
 	"github.com/Wei-Shaw/sub2api/ent/predicate"
 	"github.com/Wei-Shaw/sub2api/ent/schema/mixins"
 	dbuser "github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/ent/userallowedgroup"
-	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/lib/pq"
@@ -32,8 +28,6 @@ type userRepository struct {
 	sql    sqlExecutor
 }
 
-var _ service.RedeemUserAdjustmentRepository = (*userRepository)(nil)
-
 func NewUserRepository(client *dbent.Client, sqlDB *sql.DB) service.UserRepository {
 	return newUserRepositoryWithSQL(client, sqlDB)
 }
@@ -43,27 +37,16 @@ func newUserRepositoryWithSQL(client *dbent.Client, sqlq sqlExecutor) *userRepos
 }
 
 func (r *userRepository) Create(ctx context.Context, userIn *service.User) error {
-	return r.create(ctx, userIn, false, "")
+	return r.create(ctx, userIn, false)
 }
 
 // CreateWithEmailAliasGuard 见 service.UserRepository：在邮箱唯一性锁内复查收件箱身份，
 // 供注册路径使用。
 func (r *userRepository) CreateWithEmailAliasGuard(ctx context.Context, userIn *service.User) error {
-	return r.create(ctx, userIn, true, "")
+	return r.create(ctx, userIn, true)
 }
 
-// CountUsersByEmailDomain 统计指定可注册主域名及其子域名下的未删除用户。
-func (r *userRepository) CountUsersByEmailDomain(ctx context.Context, domain string) (int, error) {
-	return countUsersByEmailDomainWithClient(ctx, clientFromContext(ctx, r.client), domain)
-}
-
-// CreateWithEmailAliasGuardAndDomainLimit 串行化非白名单域名的注册请求，
-// 并在用户写入的同一事务内复查域名额度。
-func (r *userRepository) CreateWithEmailAliasGuardAndDomainLimit(ctx context.Context, userIn *service.User, domain string) error {
-	return r.create(ctx, userIn, true, normalizeEmailDomain(domain))
-}
-
-func (r *userRepository) create(ctx context.Context, userIn *service.User, guardEmailAlias bool, domainLimit string) error {
+func (r *userRepository) create(ctx context.Context, userIn *service.User, guardEmailAlias bool) error {
 	if userIn == nil {
 		return nil
 	}
@@ -102,9 +85,6 @@ func (r *userRepository) create(ctx context.Context, userIn *service.User, guard
 		// 别名变体的字面量不同，唯一索引无法兜底；用收件箱身份锁把同一收件箱的并发注册串行化。
 		lockKeys = append(lockKeys, emailAliasUniquenessLockKey(userIn.Email))
 	}
-	if domainLimit != "" {
-		lockKeys = append(lockKeys, registrationEmailDomainLockKey(domainLimit))
-	}
 	releaseEmailLock, err := lockRepositoryScopedKeys(
 		txCtx,
 		txClient,
@@ -115,16 +95,6 @@ func (r *userRepository) create(ctx context.Context, userIn *service.User, guard
 		return err
 	}
 	defer releaseEmailLock()
-
-	if domainLimit != "" {
-		count, err := countUsersByEmailDomainWithClient(txCtx, txClient, domainLimit)
-		if err != nil {
-			return err
-		}
-		if count > 0 {
-			return service.ErrEmailDomainRegistrationLimit
-		}
-	}
 
 	if err := ensureNormalizedEmailAvailableWithClient(txCtx, txClient, 0, userIn.Email); err != nil {
 		return err
@@ -160,9 +130,6 @@ func (r *userRepository) create(ctx context.Context, userIn *service.User, guard
 	}
 
 	if err := r.syncUserAllowedGroupsWithClient(txCtx, txClient, created.ID, userIn.AllowedGroups); err != nil {
-		return err
-	}
-	if err := ensureEmailAuthIdentityWithClient(txCtx, txClient, created.ID, created.Email, "user_repo_create"); err != nil {
 		return err
 	}
 
@@ -290,7 +257,6 @@ func (r *userRepository) Update(ctx context.Context, userIn *service.User, field
 	if err != nil {
 		return translatePersistenceError(err, service.ErrUserNotFound, nil)
 	}
-	oldEmail := existing.Email
 
 	updateOp := txClient.User.UpdateOneID(userIn.ID)
 	if fields.Email {
@@ -319,18 +285,6 @@ func (r *userRepository) Update(ctx context.Context, userIn *service.User, field
 	}
 	if fields.RestrictPublicGroups {
 		updateOp = updateOp.SetRestrictPublicGroups(userIn.RestrictPublicGroups)
-	}
-	if fields.BalanceNotifySettings {
-		updateOp = updateOp.
-			SetBalanceNotifyEnabled(userIn.BalanceNotifyEnabled).
-			SetBalanceNotifyThresholdType(userIn.BalanceNotifyThresholdType).
-			SetNillableBalanceNotifyThreshold(userIn.BalanceNotifyThreshold)
-		if userIn.BalanceNotifyThreshold == nil {
-			updateOp = updateOp.ClearBalanceNotifyThreshold()
-		}
-	}
-	if fields.BalanceNotifyExtraEmails {
-		updateOp = updateOp.SetBalanceNotifyExtraEmails(marshalExtraEmails(userIn.BalanceNotifyExtraEmails))
 	}
 	if fields.SignupSource && userIn.SignupSource != "" {
 		updateOp = updateOp.SetSignupSource(userIn.SignupSource)
@@ -363,11 +317,6 @@ func (r *userRepository) Update(ctx context.Context, userIn *service.User, field
 			return err
 		}
 	}
-	// 始终以库中的邮箱为准补齐 email 身份：未改邮箱时 updated.Email == oldEmail，
-	// 这里退化为幂等的身份补写，与改邮箱前的行为一致。
-	if err := replaceEmailAuthIdentityWithClient(txCtx, txClient, updated.ID, oldEmail, updated.Email, "user_repo_update"); err != nil {
-		return err
-	}
 
 	if tx != nil {
 		if err := tx.Commit(); err != nil {
@@ -377,91 +326,6 @@ func (r *userRepository) Update(ctx context.Context, userIn *service.User, field
 
 	userIn.UpdatedAt = updated.UpdatedAt
 	return nil
-}
-
-func ensureEmailAuthIdentityWithClient(ctx context.Context, client *dbent.Client, userID int64, email string, source string) error {
-	client = clientFromContext(ctx, client)
-	if client == nil || userID <= 0 {
-		return nil
-	}
-
-	subject := normalizeEmailAuthIdentitySubject(email)
-	if subject == "" {
-		return nil
-	}
-
-	if err := client.AuthIdentity.Create().
-		SetUserID(userID).
-		SetProviderType("email").
-		SetProviderKey("email").
-		SetProviderSubject(subject).
-		SetVerifiedAt(time.Now().UTC()).
-		SetMetadata(map[string]any{"source": source}).
-		OnConflictColumns(
-			authidentity.FieldProviderType,
-			authidentity.FieldProviderKey,
-			authidentity.FieldProviderSubject,
-		).
-		DoNothing().
-		Exec(ctx); err != nil {
-		if !isSQLNoRowsError(err) {
-			return err
-		}
-	}
-
-	identity, err := client.AuthIdentity.Query().
-		Where(
-			authidentity.ProviderTypeEQ("email"),
-			authidentity.ProviderKeyEQ("email"),
-			authidentity.ProviderSubjectEQ(subject),
-		).
-		Only(ctx)
-	if err != nil {
-		if dbent.IsNotFound(err) {
-			return nil
-		}
-		return err
-	}
-	if identity.UserID != userID {
-		return ErrAuthIdentityOwnershipConflict
-	}
-	return nil
-}
-
-func replaceEmailAuthIdentityWithClient(ctx context.Context, client *dbent.Client, userID int64, oldEmail, newEmail string, source string) error {
-	newSubject := normalizeEmailAuthIdentitySubject(newEmail)
-	if err := ensureEmailAuthIdentityWithClient(ctx, client, userID, newEmail, source); err != nil {
-		return err
-	}
-
-	oldSubject := normalizeEmailAuthIdentitySubject(oldEmail)
-	if oldSubject == "" || oldSubject == newSubject {
-		return nil
-	}
-
-	_, err := clientFromContext(ctx, client).AuthIdentity.Delete().
-		Where(
-			authidentity.UserIDEQ(userID),
-			authidentity.ProviderTypeEQ("email"),
-			authidentity.ProviderKeyEQ("email"),
-			authidentity.ProviderSubjectEQ(oldSubject),
-		).
-		Exec(ctx)
-	return err
-}
-
-func normalizeEmailAuthIdentitySubject(email string) string {
-	normalized := strings.ToLower(strings.TrimSpace(email))
-	if normalized == "" {
-		return ""
-	}
-	if strings.HasSuffix(normalized, service.LinuxDoConnectSyntheticEmailDomain) ||
-		strings.HasSuffix(normalized, service.OIDCConnectSyntheticEmailDomain) ||
-		strings.HasSuffix(normalized, service.WeChatConnectSyntheticEmailDomain) ||
-		strings.HasSuffix(normalized, service.DingTalkConnectSyntheticEmailDomain) {
-		return ""
-	}
-	return normalized
 }
 
 func (r *userRepository) Delete(ctx context.Context, id int64) error {
@@ -496,31 +360,6 @@ func (r *userRepository) Delete(ctx context.Context, id int64) error {
 
 // deleteUser 在给定 client（可能是外部事务 client）上删除用户及其身份关联记录，自身不开启/提交事务。
 func (r *userRepository) deleteUser(ctx context.Context, exec *dbent.Client, id int64) error {
-	identityIDs, err := exec.AuthIdentity.Query().
-		Where(authidentity.UserIDEQ(id)).
-		IDs(ctx)
-	if err != nil {
-		return translatePersistenceError(err, service.ErrUserNotFound, nil)
-	}
-	if len(identityIDs) > 0 {
-		if _, err := exec.IdentityAdoptionDecision.Update().
-			Where(identityadoptiondecision.IdentityIDIn(identityIDs...)).
-			ClearIdentityID().
-			Save(ctx); err != nil {
-			return translatePersistenceError(err, service.ErrUserNotFound, nil)
-		}
-		if _, err := exec.AuthIdentityChannel.Delete().
-			Where(authidentitychannel.IdentityIDIn(identityIDs...)).
-			Exec(ctx); err != nil {
-			return translatePersistenceError(err, service.ErrUserNotFound, nil)
-		}
-		if _, err := exec.AuthIdentity.Delete().
-			Where(authidentity.UserIDEQ(id)).
-			Exec(ctx); err != nil {
-			return translatePersistenceError(err, service.ErrUserNotFound, nil)
-		}
-	}
-
 	affected, err := exec.User.Delete().Where(dbuser.IDEQ(id)).Exec(ctx)
 	if err != nil {
 		return translatePersistenceError(err, service.ErrUserNotFound, nil)
@@ -578,21 +417,6 @@ func (r *userRepository) ListWithFilters(ctx context.Context, params pagination.
 		))
 	}
 
-	// If attribute filters are specified, we need to filter by user IDs first
-	var allowedUserIDs []int64
-	if len(filters.Attributes) > 0 {
-		var attrErr error
-		allowedUserIDs, attrErr = r.filterUsersByAttributes(ctx, filters.Attributes)
-		if attrErr != nil {
-			return nil, nil, attrErr
-		}
-		if len(allowedUserIDs) == 0 {
-			// No users match the attribute filters
-			return []service.User{}, paginationResultFromTotal(0, params), nil
-		}
-		q = q.Where(dbuser.IDIn(allowedUserIDs...))
-	}
-
 	total, err := q.Clone().Count(userCtx)
 	if err != nil {
 		return nil, nil, err
@@ -622,27 +446,6 @@ func (r *userRepository) ListWithFilters(ctx context.Context, params pagination.
 		u := userEntityToService(users[i])
 		outUsers = append(outUsers, *u)
 		userMap[u.ID] = &outUsers[len(outUsers)-1]
-	}
-
-	shouldLoadSubscriptions := filters.IncludeSubscriptions == nil || *filters.IncludeSubscriptions
-	if shouldLoadSubscriptions {
-		// Batch load active subscriptions with groups to avoid N+1.
-		subs, err := r.client.UserSubscription.Query().
-			Where(
-				usersubscription.UserIDIn(userIDs...),
-				usersubscription.StatusEQ(service.SubscriptionStatusActive),
-			).
-			WithGroup().
-			All(ctx)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		for i := range subs {
-			if u, ok := userMap[subs[i].UserID]; ok {
-				u.Subscriptions = append(u.Subscriptions, *userSubscriptionEntityToService(subs[i]))
-			}
-		}
 	}
 
 	allowedGroupsByUser, err := r.loadAllowedGroups(ctx, userIDs)
@@ -787,56 +590,6 @@ func userLastUsedAtOrder(sortOrder string) []func(*entsql.Selector) {
 	return []func(*entsql.Selector){
 		orderExpr("DESC", "LAST", entsql.Desc),
 	}
-}
-
-// filterUsersByAttributes returns user IDs that match ALL the given attribute filters
-func (r *userRepository) filterUsersByAttributes(ctx context.Context, attrs map[int64]string) ([]int64, error) {
-	if len(attrs) == 0 {
-		return nil, nil
-	}
-
-	if r.sql == nil {
-		return nil, fmt.Errorf("sql executor is not configured")
-	}
-
-	clauses := make([]string, 0, len(attrs))
-	args := make([]any, 0, len(attrs)*2+1)
-	argIndex := 1
-	for attrID, value := range attrs {
-		clauses = append(clauses, fmt.Sprintf("(attribute_id = $%d AND value ILIKE $%d)", argIndex, argIndex+1))
-		args = append(args, attrID, "%"+value+"%")
-		argIndex += 2
-	}
-
-	query := fmt.Sprintf(
-		`SELECT user_id
-		 FROM user_attribute_values
-		 WHERE %s
-		 GROUP BY user_id
-		 HAVING COUNT(DISTINCT attribute_id) = $%d`,
-		strings.Join(clauses, " OR "),
-		argIndex,
-	)
-	args = append(args, len(attrs))
-
-	rows, err := r.sql.QueryContext(ctx, query, args...)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	result := make([]int64, 0)
-	for rows.Next() {
-		var userID int64
-		if scanErr := rows.Scan(&userID); scanErr != nil {
-			return nil, scanErr
-		}
-		result = append(result, userID)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return result, nil
 }
 
 func (r *userRepository) UpdateBalance(ctx context.Context, id int64, amount float64) error {
@@ -1346,48 +1099,6 @@ func normalizedEmailUniquenessLockKey(email string) string {
 	return "users:normalized-email:" + normalized
 }
 
-func registrationEmailDomainLockKey(domain string) string {
-	domain = normalizeEmailDomain(domain)
-	if domain == "" {
-		return ""
-	}
-	return "users:registration-email-domain:" + domain
-}
-
-func normalizeEmailDomain(domain string) string {
-	return service.NormalizeRegistrationEmailDomain(domain)
-}
-
-func countUsersByEmailDomainWithClient(ctx context.Context, client *dbent.Client, domain string) (int, error) {
-	client = clientFromContext(ctx, client)
-	domain = normalizeEmailDomain(domain)
-	if client == nil || domain == "" {
-		return 0, nil
-	}
-	return client.User.Query().Where(userEmailDomainPredicate(domain)).Count(ctx)
-}
-
-func userEmailDomainPredicate(domain string) predicate.User {
-	domain = normalizeEmailDomain(domain)
-	escapedDomain := escapeLikeWildcards(domain)
-	exactPattern := "%@" + escapedDomain
-	subdomainPattern := "%@%." + escapedDomain
-	return predicate.User(func(s *entsql.Selector) {
-		s.Where(entsql.P(func(b *entsql.Builder) {
-			b.WriteString("(RTRIM(LOWER(TRIM(").
-				Ident(s.C(dbuser.FieldEmail)).
-				WriteString(")), '.') LIKE ").
-				Arg(exactPattern).
-				WriteString(` ESCAPE '\' OR RTRIM(LOWER(TRIM(`).
-				Ident(s.C(dbuser.FieldEmail)).
-				WriteString(")), '.') LIKE ").
-				Arg(subdomainPattern).
-				WriteString(` ESCAPE '\'`).
-				WriteString(")")
-		}))
-	})
-}
-
 // emailAliasUniquenessLockKey 按收件箱身份（而非邮箱字面量）加锁，使同一收件箱的不同
 // 别名变体在注册时互斥。
 func emailAliasUniquenessLockKey(email string) string {
@@ -1560,11 +1271,6 @@ func userSignupSourceOrDefault(signupSource string) string {
 	default:
 		return "email"
 	}
-}
-
-// marshalExtraEmails serializes notify email entries to JSON for storage.
-func marshalExtraEmails(entries []service.NotifyEmailEntry) string {
-	return service.MarshalNotifyEmails(entries)
 }
 
 // UpdateTotpSecret 更新用户的 TOTP 加密密钥

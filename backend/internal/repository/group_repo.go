@@ -924,32 +924,6 @@ func (r *groupRepository) deleteCascade(ctx context.Context, id int64, requireEm
 	}
 
 	var affectedUserIDs []int64
-	if subscriptionType == service.SubscriptionTypeSubscription {
-		// 只查询未软删除的订阅，避免通知已取消订阅的用户
-		rows, err := exec.QueryContext(ctx, "SELECT user_id FROM user_subscriptions WHERE group_id = $1 AND deleted_at IS NULL", id)
-		if err != nil {
-			return nil, err
-		}
-		for rows.Next() {
-			var userID int64
-			if scanErr := rows.Scan(&userID); scanErr != nil {
-				_ = rows.Close()
-				return nil, scanErr
-			}
-			affectedUserIDs = append(affectedUserIDs, userID)
-		}
-		if err := rows.Close(); err != nil {
-			return nil, err
-		}
-		if err := rows.Err(); err != nil {
-			return nil, err
-		}
-
-		// 软删除订阅：设置 deleted_at 而非硬删除
-		if _, err := exec.ExecContext(ctx, "UPDATE user_subscriptions SET deleted_at = NOW() WHERE group_id = $1 AND deleted_at IS NULL", id); err != nil {
-			return nil, err
-		}
-	}
 
 	// 2. Remove the group id from user_allowed_groups join table.
 	// Legacy users.allowed_groups 列已弃用，不再同步。

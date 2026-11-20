@@ -17,9 +17,9 @@ function deferred<T>() {
 import OpsSettingsDialog from '../OpsSettingsDialog.vue'
 const { opsAPI, showError } = vi.hoisted(() => ({
   opsAPI: {
-    getAlertRuntimeSettings: vi.fn(), getEmailNotificationConfig: vi.fn(),
+    getAlertRuntimeSettings: vi.fn(),
     getAdvancedSettings: vi.fn(), getMetricThresholds: vi.fn(),
-    updateAlertRuntimeSettings: vi.fn(), updateEmailNotificationConfig: vi.fn(),
+    updateAlertRuntimeSettings: vi.fn(),
     updateAdvancedSettings: vi.fn(), updateMetricThresholds: vi.fn(),
   }, showError: vi.fn(),
 }))
@@ -39,7 +39,6 @@ describe('ops settings load guard', () => {
     vi.resetAllMocks()
     vi.spyOn(console, 'error').mockImplementation(() => {})
     opsAPI.getAlertRuntimeSettings.mockResolvedValue({ evaluation_interval_seconds: 30 })
-    opsAPI.getEmailNotificationConfig.mockResolvedValue({ alert: { enabled: false }, report: { enabled: false } })
     opsAPI.getAdvancedSettings.mockResolvedValue({ data_retention: { error_log_retention_days: 7, minute_metrics_retention_days: 7, hourly_metrics_retention_days: 7 } })
     opsAPI.getMetricThresholds.mockResolvedValue({ sla_percent_min: 98 })
   })

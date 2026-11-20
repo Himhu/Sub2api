@@ -102,8 +102,7 @@ func TestScopedAdminRegisteredRoutesEnforceDefaultDenyAndAccountScope(t *testing
 			auth := middleware.NewAdminAuthMiddleware(nil, users, settings, nil)
 			accountHandler := adminhandler.NewAccountHandler(&scopedRouteAccounts{t: t}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 			r := gin.New()
-			RegisterAdminRoutes(r.Group("/api/v1"), &handler.Handlers{Admin: &handler.AdminHandlers{Account: accountHandler, Setting: adminhandler.NewSettingHandler(settings, nil, nil, nil, nil, nil, nil)}}, auth, middleware.AuditLogMiddleware(func(c *gin.Context) { c.Next() }), middleware.StepUpAuthMiddleware(func(c *gin.Context) { c.Next() }), nil, nil)
-			RegisterPaymentRoutes(r.Group("/api/v1"), &handler.PaymentHandler{}, &handler.PaymentWebhookHandler{}, &adminhandler.PaymentHandler{}, middleware.JWTAuthMiddleware(func(c *gin.Context) { c.Next() }), auth, middleware.AuditLogMiddleware(func(c *gin.Context) { c.Next() }), nil, nil, nil)
+			RegisterAdminRoutes(r.Group("/api/v1"), &handler.Handlers{Admin: &handler.AdminHandlers{Account: accountHandler, Setting: adminhandler.NewSettingHandler(settings, nil, nil)}}, auth, middleware.AuditLogMiddleware(func(c *gin.Context) { c.Next() }), middleware.StepUpAuthMiddleware(func(c *gin.Context) { c.Next() }), nil, nil)
 			for _, tc := range []struct{ method, path string }{
 				{"GET", "/api/v1/admin/accounts/1"},
 				{"GET", "/api/v1/admin/accounts/2"},
@@ -111,13 +110,9 @@ func TestScopedAdminRegisteredRoutesEnforceDefaultDenyAndAccountScope(t *testing
 				{"GET", "/api/v1/admin/accounts/5"},
 				{"GET", "/api/v1/admin/accounts/6"},
 				{"DELETE", "/api/v1/admin/accounts/1"},
-				{"GET", "/api/v1/admin/users"},
 				{"PUT", "/api/v1/admin/settings"},
 				{"GET", "/api/v1/admin/settings/admin-api-keys"},
 				{"GET", "/api/v1/admin/groups"},
-				{"GET", "/api/v1/admin/payment/orders"},
-				{"POST", "/api/v1/admin/payment/orders/1/refund"},
-				{"PUT", "/api/v1/admin/payment/config"},
 			} {
 				req := httptest.NewRequest(tc.method, tc.path, nil)
 				req.Header.Set("x-api-key", key)
@@ -160,7 +155,7 @@ func TestScopedAdminRegisteredModelDefaultsRequireExplicitPermission(t *testing.
 		auth := middleware.NewAdminAuthMiddleware(nil, users, settings, nil)
 		accountHandler := adminhandler.NewAccountHandler(&scopedRouteAccounts{t: t}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 		r := gin.New()
-		RegisterAdminRoutes(r.Group("/api/v1"), &handler.Handlers{Admin: &handler.AdminHandlers{Account: accountHandler, Setting: adminhandler.NewSettingHandler(settings, nil, nil, nil, nil, nil, nil)}}, auth, middleware.AuditLogMiddleware(func(c *gin.Context) { c.Next() }), middleware.StepUpAuthMiddleware(func(c *gin.Context) { c.Next() }), nil, nil)
+		RegisterAdminRoutes(r.Group("/api/v1"), &handler.Handlers{Admin: &handler.AdminHandlers{Account: accountHandler, Setting: adminhandler.NewSettingHandler(settings, nil, nil)}}, auth, middleware.AuditLogMiddleware(func(c *gin.Context) { c.Next() }), middleware.StepUpAuthMiddleware(func(c *gin.Context) { c.Next() }), nil, nil)
 		for _, path := range []string{"/api/v1/admin/accounts/antigravity/default-model-mapping"} {
 			req := httptest.NewRequest("GET", path, nil)
 			req.Header.Set("x-api-key", key)

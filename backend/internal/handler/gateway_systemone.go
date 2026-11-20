@@ -85,7 +85,6 @@ func (h *GatewayHandler) SystemOne(c *gin.Context) {
 	pricingCtx, pricingAt := service.WithGatewayTokenRequestPricing(c.Request.Context())
 	c.Request = c.Request.WithContext(pricingCtx)
 	channelMapping, _ := h.gatewayService.ResolveChannelMappingAndRestrict(c.Request.Context(), apiKey.GroupID, model)
-	subscription, _ := middleware2.GetSubscriptionFromContext(c)
 
 	streamStarted := false
 	userRelease, err := h.concurrencyHelper.AcquireUserSlotWithWait(c, subject.UserID, subject.Concurrency, false, &streamStarted)
@@ -99,7 +98,7 @@ func (h *GatewayHandler) SystemOne(c *gin.Context) {
 	if userRelease != nil {
 		defer userRelease()
 	}
-	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
+	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		reqLog.Info("systemone.billing_eligibility_check_failed", zap.Error(err))
 		status, code, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
@@ -109,7 +108,7 @@ func (h *GatewayHandler) SystemOne(c *gin.Context) {
 		return
 	}
 	// 余额模式在途预留：防止并发请求在预检时看到同一份余额而集体透支。
-	inflightRelease, err := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, tokenInflightEstimate(model, body))
+	inflightRelease, err := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, tokenInflightEstimate(model, body))
 	if err != nil {
 		reqLog.Info("systemone.inflight_reservation_rejected", zap.Error(err))
 		status, code, message, retryAfter := billingErrorDetails(err)
@@ -244,12 +243,12 @@ func (h *GatewayHandler) SystemOne(c *gin.Context) {
 		}
 
 		c.Data(result.StatusCode, result.ContentType, result.Body)
-		h.recordSystemOneUsage(c, apiKey, account, subscription, channelMapping, model, body, result, subject.UserID, pricingAt)
+		h.recordSystemOneUsage(c, apiKey, account, channelMapping, model, body, result, subject.UserID, pricingAt)
 		return
 	}
 }
 
-func (h *GatewayHandler) recordSystemOneUsage(c *gin.Context, apiKey *service.APIKey, account *service.Account, subscription *service.UserSubscription, mapping service.ChannelMappingResult, model string, body []byte, result *service.SystemOneForwardResult, userID int64, pricingAt time.Time) {
+func (h *GatewayHandler) recordSystemOneUsage(c *gin.Context, apiKey *service.APIKey, account *service.Account, mapping service.ChannelMappingResult, model string, body []byte, result *service.SystemOneForwardResult, userID int64, pricingAt time.Time) {
 	userAgent := c.GetHeader("User-Agent")
 	clientIP := ip.GetClientIP(c)
 	inboundEndpoint := GetInboundEndpoint(c)
@@ -268,7 +267,6 @@ func (h *GatewayHandler) recordSystemOneUsage(c *gin.Context, apiKey *service.AP
 			APIKey:             apiKey,
 			User:               apiKey.User,
 			Account:            account,
-			Subscription:       subscription,
 			PricingAt:          pricingAt,
 			InboundEndpoint:    inboundEndpoint,
 			UpstreamEndpoint:   upstreamEndpoint,

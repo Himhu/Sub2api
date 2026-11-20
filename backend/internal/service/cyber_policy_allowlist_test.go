@@ -42,7 +42,7 @@ func TestRecordCyberPolicyEventLogOnlyPreservesEvidenceWithoutSideEffects(t *tes
 	repo := &banCountArgsTestRepo{}
 	svc := NewContentModerationService(
 		&contentModerationTestSettingRepo{values: map[string]string{SettingKeyRiskControlEnabled: "true"}},
-		repo, nil, nil, nil, nil, nil, &EmailService{},
+		repo, nil, nil, nil, nil, nil,
 	)
 	// An unconfigured email service must never be invoked in log-only mode.
 	svc.RecordCyberPolicyEvent(context.Background(), CyberPolicyRecordInput{

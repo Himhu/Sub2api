@@ -121,12 +121,12 @@ func serveMessagesScenario(t *testing.T, sc preContentFailoverScenario) (*httpte
 	cfg.Gateway.MaxAccountSwitches = 3
 	cfg.Gateway.StreamKeepaliveInterval = 1
 	cfg.Security.URLAllowlist.AllowInsecureHTTP = true
-	billingCache := service.NewBillingCacheService(nil, nil, nil, nil, nil, nil, cfg, nil)
+	billingCache := service.NewBillingCacheService(nil, nil, nil, nil, nil, cfg, nil)
 	t.Cleanup(billingCache.Stop)
 	gateway := service.NewOpenAIGatewayService(
-		repo, nil, nil, nil, nil, nil, nil, cfg, nil, nil,
+		repo, nil, nil, nil, nil, nil, cfg, nil, nil,
 		service.NewBillingService(cfg, nil), nil, billingCache, upstream,
-		&service.DeferredService{}, nil, nil, nil, nil, nil, nil, nil,
+		&service.DeferredService{}, nil, nil, nil, nil, nil, nil,
 	)
 	cache := &concurrencyCacheMock{
 		acquireUserSlotFn:    func(context.Context, int64, int, string) (bool, error) { return true, nil },

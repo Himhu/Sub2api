@@ -138,8 +138,6 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 		service.BindErrorPassthroughService(c, h.errorPassthroughService)
 	}
 
-	subscription, _ := middleware2.GetSubscriptionFromContext(c)
-
 	service.SetOpsLatencyMs(c, service.OpsAuthLatencyMsKey, time.Since(requestStart).Milliseconds())
 
 	userReleaseFunc, err := h.concurrencyHelper.AcquireUserSlotWithWait(c, subject.UserID, subject.Concurrency, reqStream, &streamStarted)
@@ -154,7 +152,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 	}
 
 	// 2. Re-check billing
-	if err := h.billingCacheService.CheckBillingEligibility(requestCtx, apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(requestCtx, apiKey)); err != nil {
+	if err := h.billingCacheService.CheckBillingEligibility(requestCtx, apiKey.User, apiKey, apiKey.Group, service.QuotaPlatform(requestCtx, apiKey)); err != nil {
 		reqLog.Info("gateway.responses.billing_check_failed", zap.Error(err))
 		status, code, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
@@ -165,7 +163,7 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 	}
 
 	// 余额模式在途预留：防止并发请求在预检时看到同一份余额而集体透支。
-	inflightRelease, err := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, tokenInflightEstimate(reqModel, body))
+	inflightRelease, err := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, tokenInflightEstimate(reqModel, body))
 	if err != nil {
 		reqLog.Info("gateway.responses.inflight_reservation_rejected", zap.Error(err))
 		status, code, message, retryAfter := billingErrorDetails(err)
@@ -329,7 +327,6 @@ func (h *GatewayHandler) Responses(c *gin.Context) {
 					APIKey:             apiKey,
 					User:               apiKey.User,
 					Account:            account,
-					Subscription:       subscription,
 					PricingAt:          pricingAt,
 					InboundEndpoint:    inboundEndpoint,
 					UpstreamEndpoint:   upstreamEndpoint,

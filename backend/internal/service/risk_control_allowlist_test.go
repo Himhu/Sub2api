@@ -82,7 +82,7 @@ func TestRiskControlAllowlistAuditsWithoutLocalPenalties(t *testing.T) {
 				settingRepo: &contentModerationTestSettingRepo{values: map[string]string{
 					SettingKeyRiskControlEnabled: "true", SettingKeyContentModerationConfig: string(raw), SettingKeyCyberPolicyUserAllowlist: "12",
 				}},
-				repo: repo, hashCache: hashes, emailService: &EmailService{},
+				repo: repo, hashCache: hashes,
 				httpClient: server.Client(), asyncQueue: make(chan contentModerationTask, 4), keyHealth: make(map[string]*contentModerationKeyHealth),
 			}
 			decision, err := svc.Check(context.Background(), ContentModerationCheckInput{

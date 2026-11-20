@@ -89,9 +89,7 @@ func TestRedactAuditBody_AuthoritativeTablesSynced(t *testing.T) {
 		"proxy_key": "socks5|1.2.3.4|1080|proxyuser|proxypass-ddd",
 		"custom_key": "sk-custom-eee",
 		"config": {
-			"pkey": "easypay-merchant-fff",
 			"privateKey": "alipay-pem-ggg",
-			"apiv3key": "wxpay-v3-hhh",
 			"SecretKey": "stripe-sk-iii",
 			"webhookSecret": "whsec-jjj"
 		},
@@ -103,7 +101,7 @@ func TestRedactAuditBody_AuthoritativeTablesSynced(t *testing.T) {
 	for _, secret := range []string{
 		"sk-session-aaa", "pem-body-bbb", "sa-blob-ccc",
 		"proxypass-ddd", "sk-custom-eee",
-		"easypay-merchant-fff", "alipay-pem-ggg", "wxpay-v3-hhh",
+		"alipay-pem-ggg",
 		"stripe-sk-iii", "whsec-jjj",
 	} {
 		if strings.Contains(out, secret) {
@@ -124,13 +122,6 @@ func TestAuditSensitiveKeys_CoverCredentialTable(t *testing.T) {
 	for _, k := range SensitiveCredentialKeys {
 		if !isAuditSensitiveBodyKey(k) {
 			t.Fatalf("credential key %q is not covered by audit redaction", k)
-		}
-	}
-	for provider, fields := range providerSensitiveConfigFields {
-		for k := range fields {
-			if !isAuditSensitiveBodyKey(k) {
-				t.Fatalf("payment provider %q sensitive field %q is not covered by audit redaction", provider, k)
-			}
 		}
 	}
 }

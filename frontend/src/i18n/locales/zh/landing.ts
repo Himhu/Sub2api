@@ -147,14 +147,12 @@ export default {
     cost: '费用',
     // Status
     quotaMode: 'Key 限额模式',
-    walletBalance: '钱包余额',
+    unlimited: '不限额',
     // Ring card titles
     totalQuota: '总额度',
     limit5h: '5 小时限额',
     limitDaily: '日限额',
     limit7d: '7 天限额',
-    limitWeekly: '周限额',
-    limitMonthly: '月限额',
     // Detail rows
     remainingQuota: '剩余额度',
     expiresAt: '过期时间',
@@ -162,9 +160,7 @@ export default {
     daysLeft: '({days} 天)',
     usedQuota: '已用额度',
     resetNow: '即将重置',
-    subscriptionType: '订阅类型',
     billingType: '计费方式',
-    subscriptionExpires: '订阅到期',
     // Usage stat cells
     todayRequests: '今日请求',
     todayInputTokens: '今日输入',

@@ -155,9 +155,9 @@ func TestCodexModelsAppliesLocalFiltersBeforeClientETag(t *testing.T) {
 	}
 	gatewayService := service.NewOpenAIGatewayService(
 		repo,
-		nil, nil, nil, nil, nil, nil, &config.Config{RunMode: config.RunModeSimple}, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, &config.Config{RunMode: config.RunModeSimple}, nil, nil, nil, nil, nil,
 		upstream,
-		nil, nil, nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil,
 	)
 	handler := &OpenAIGatewayHandler{gatewayService: gatewayService}
 	group := &service.Group{
@@ -224,9 +224,9 @@ func TestCodexModelsAPIKeyCacheDoesNotLeakGroupFilters(t *testing.T) {
 	}
 	gatewayService := service.NewOpenAIGatewayService(
 		repo,
-		nil, nil, nil, nil, nil, nil, &config.Config{RunMode: config.RunModeSimple}, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, &config.Config{RunMode: config.RunModeSimple}, nil, nil, nil, nil, nil,
 		upstream,
-		nil, nil, nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil,
 	)
 	handler := &OpenAIGatewayHandler{gatewayService: gatewayService}
 	groupA := &service.Group{
@@ -330,9 +330,9 @@ func TestCodexModelsSupplementsConfiguredModelsWithUnmappedAccountDefaults(t *te
 	upstream := &codexModelsFailoverHTTPUpstream{firstStatus: http.StatusNotFound}
 	gatewayService := service.NewOpenAIGatewayService(
 		repo,
-		nil, nil, nil, nil, nil, nil, &config.Config{RunMode: config.RunModeSimple}, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, &config.Config{RunMode: config.RunModeSimple}, nil, nil, nil, nil, nil,
 		upstream,
-		nil, nil, nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil,
 	)
 	handler := &OpenAIGatewayHandler{gatewayService: gatewayService}
 
@@ -379,9 +379,9 @@ func TestCodexModelsUnmappedParentAndSparkShadowHonorCustomListAndETag(t *testin
 	upstream := &codexModelsFailoverHTTPUpstream{firstStatus: http.StatusNotFound}
 	gatewayService := service.NewOpenAIGatewayService(
 		repo,
-		nil, nil, nil, nil, nil, nil, &config.Config{RunMode: config.RunModeSimple}, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, &config.Config{RunMode: config.RunModeSimple}, nil, nil, nil, nil, nil,
 		upstream,
-		nil, nil, nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil,
 	)
 	handler := &OpenAIGatewayHandler{gatewayService: gatewayService}
 	group := &service.Group{ID: 45, Platform: service.PlatformOpenAI}
@@ -596,9 +596,9 @@ func newCodexModelsFailoverTestHandlerWithAccountCount(firstStatus, accountCount
 	cfg := &config.Config{RunMode: config.RunModeSimple}
 	gatewayService := service.NewOpenAIGatewayService(
 		codexModelsFailoverAccountRepo{accounts: accounts},
-		nil, nil, nil, nil, nil, nil, cfg, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, cfg, nil, nil, nil, nil, nil,
 		upstream,
-		nil, nil, nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil,
 	)
 	return &OpenAIGatewayHandler{gatewayService: gatewayService, maxAccountSwitches: maxSwitches}, upstream, groupID
 }
@@ -759,9 +759,9 @@ func newPinnedCodexTestHandler(accounts []service.Account, upstream *codexModels
 	cfg := &config.Config{RunMode: config.RunModeSimple}
 	gatewayService := service.NewOpenAIGatewayService(
 		codexModelsFailoverAccountRepo{accounts: accounts},
-		nil, nil, nil, nil, nil, nil, cfg, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, cfg, nil, nil, nil, nil, nil,
 		upstream,
-		nil, nil, nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil,
 	)
 	return &OpenAIGatewayHandler{gatewayService: gatewayService, maxAccountSwitches: maxSwitches}
 }

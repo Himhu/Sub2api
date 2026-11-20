@@ -2310,16 +2310,6 @@
           :totalLimit="editQuotaLimit"
           :dailyLimit="editQuotaDailyLimit"
           :weeklyLimit="editQuotaWeeklyLimit"
-          :quotaNotifyGlobalEnabled="quotaNotifyGlobalEnabled"
-          :quotaNotifyDailyEnabled="quotaNotifyState.daily.enabled"
-          :quotaNotifyDailyThreshold="quotaNotifyState.daily.threshold"
-          :quotaNotifyDailyThresholdType="quotaNotifyState.daily.thresholdType"
-          :quotaNotifyWeeklyEnabled="quotaNotifyState.weekly.enabled"
-          :quotaNotifyWeeklyThreshold="quotaNotifyState.weekly.threshold"
-          :quotaNotifyWeeklyThresholdType="quotaNotifyState.weekly.thresholdType"
-          :quotaNotifyTotalEnabled="quotaNotifyState.total.enabled"
-          :quotaNotifyTotalThreshold="quotaNotifyState.total.threshold"
-          :quotaNotifyTotalThresholdType="quotaNotifyState.total.thresholdType"
           :dailyResetMode="editDailyResetMode"
           :dailyResetHour="editDailyResetHour"
           :weeklyResetMode="editWeeklyResetMode"
@@ -2329,15 +2319,6 @@
           @update:totalLimit="editQuotaLimit = $event"
           @update:dailyLimit="editQuotaDailyLimit = $event"
           @update:weeklyLimit="editQuotaWeeklyLimit = $event"
-          @update:quotaNotifyDailyEnabled="quotaNotifyState.daily.enabled = $event"
-          @update:quotaNotifyDailyThreshold="quotaNotifyState.daily.threshold = $event"
-          @update:quotaNotifyDailyThresholdType="quotaNotifyState.daily.thresholdType = $event"
-          @update:quotaNotifyWeeklyEnabled="quotaNotifyState.weekly.enabled = $event"
-          @update:quotaNotifyWeeklyThreshold="quotaNotifyState.weekly.threshold = $event"
-          @update:quotaNotifyWeeklyThresholdType="quotaNotifyState.weekly.thresholdType = $event"
-          @update:quotaNotifyTotalEnabled="quotaNotifyState.total.enabled = $event"
-          @update:quotaNotifyTotalThreshold="quotaNotifyState.total.threshold = $event"
-          @update:quotaNotifyTotalThresholdType="quotaNotifyState.total.thresholdType = $event"
           @update:dailyResetMode="editDailyResetMode = $event"
           @update:dailyResetHour="editDailyResetHour = $event"
           @update:weeklyResetMode="editWeeklyResetMode = $event"
@@ -2362,16 +2343,6 @@
           :totalLimit="editQuotaLimit"
           :dailyLimit="editQuotaDailyLimit"
           :weeklyLimit="editQuotaWeeklyLimit"
-          :quotaNotifyGlobalEnabled="quotaNotifyGlobalEnabled"
-          :quotaNotifyDailyEnabled="quotaNotifyState.daily.enabled"
-          :quotaNotifyDailyThreshold="quotaNotifyState.daily.threshold"
-          :quotaNotifyDailyThresholdType="quotaNotifyState.daily.thresholdType"
-          :quotaNotifyWeeklyEnabled="quotaNotifyState.weekly.enabled"
-          :quotaNotifyWeeklyThreshold="quotaNotifyState.weekly.threshold"
-          :quotaNotifyWeeklyThresholdType="quotaNotifyState.weekly.thresholdType"
-          :quotaNotifyTotalEnabled="quotaNotifyState.total.enabled"
-          :quotaNotifyTotalThreshold="quotaNotifyState.total.threshold"
-          :quotaNotifyTotalThresholdType="quotaNotifyState.total.thresholdType"
           :dailyResetMode="editDailyResetMode"
           :dailyResetHour="editDailyResetHour"
           :weeklyResetMode="editWeeklyResetMode"
@@ -2381,15 +2352,6 @@
           @update:totalLimit="editQuotaLimit = $event"
           @update:dailyLimit="editQuotaDailyLimit = $event"
           @update:weeklyLimit="editQuotaWeeklyLimit = $event"
-          @update:quotaNotifyDailyEnabled="quotaNotifyState.daily.enabled = $event"
-          @update:quotaNotifyDailyThreshold="quotaNotifyState.daily.threshold = $event"
-          @update:quotaNotifyDailyThresholdType="quotaNotifyState.daily.thresholdType = $event"
-          @update:quotaNotifyWeeklyEnabled="quotaNotifyState.weekly.enabled = $event"
-          @update:quotaNotifyWeeklyThreshold="quotaNotifyState.weekly.threshold = $event"
-          @update:quotaNotifyWeeklyThresholdType="quotaNotifyState.weekly.thresholdType = $event"
-          @update:quotaNotifyTotalEnabled="quotaNotifyState.total.enabled = $event"
-          @update:quotaNotifyTotalThreshold="quotaNotifyState.total.threshold = $event"
-          @update:quotaNotifyTotalThresholdType="quotaNotifyState.total.thresholdType = $event"
           @update:dailyResetMode="editDailyResetMode = $event"
           @update:dailyResetHour="editDailyResetHour = $event"
           @update:weeklyResetMode="editWeeklyResetMode = $event"
@@ -3273,10 +3235,10 @@
         <input v-model="expiresAtInput" type="datetime-local" class="input" />
         <div class="mt-2 flex gap-2">
           <button type="button" class="btn btn-secondary btn-sm" @click="form.expires_at = getAccountExpiryTimestamp(1)">
-            {{ t('payment.oneMonth') }}
+            {{ t('common.oneMonth') }}
           </button>
           <button type="button" class="btn btn-secondary btn-sm" @click="form.expires_at = getAccountExpiryTimestamp(12)">
-            {{ t('payment.oneYear') }}
+            {{ t('common.oneYear') }}
           </button>
         </div>
         <p class="input-hint">
@@ -4149,7 +4111,6 @@ import {
   isValidWildcardPattern
 } from '@/composables/useModelWhitelist'
 import { adminAPI } from '@/api/admin'
-import { useQuotaNotifyState } from '@/composables/useQuotaNotifyState'
 import {
   useAccountOAuth,
   type AddMethod,
@@ -4763,19 +4724,12 @@ const toggleOpenAILongContextBilling = () => {
   openAILongContextBillingEnabled.value = !openAILongContextBillingEnabled.value
   openAILongContextBillingTouched.value = true
 }
-const {
-  globalEnabled: quotaNotifyGlobalEnabled,
-  state: quotaNotifyState,
-  loadGlobalState: loadQuotaNotifyGlobal,
-  writeToExtra: writeQuotaNotifyToExtra,
-} = useQuotaNotifyState()
 
 // Load global feature states once
 adminAPI.settings.getWebSearchEmulationConfig().then(cfg => {
   webSearchGlobalEnabled.value = cfg?.enabled === true && (cfg?.providers?.length ?? 0) > 0
 }).catch(() => { webSearchGlobalEnabled.value = false })
 
-loadQuotaNotifyGlobal()
 const mixedScheduling = ref(false) // For antigravity accounts: enable mixed scheduling
 const allowOverages = ref(false) // For antigravity accounts: enable AI Credits overages
 const antigravityAccountType = ref<'oauth' | 'upstream'>('oauth') // For antigravity: oauth or upstream
@@ -6350,8 +6304,6 @@ const createAccountAndFinish = async (
     if (editDailyResetMode.value === 'fixed' || editWeeklyResetMode.value === 'fixed') {
       quotaExtra.quota_reset_timezone = editResetTimezone.value || 'UTC'
     }
-    // Quota notify config
-    writeQuotaNotifyToExtra(quotaExtra, 'create')
     if (Object.keys(quotaExtra).length > 0) {
       finalExtra = quotaExtra
     }

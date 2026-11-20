@@ -22,28 +22,11 @@ func (k *APIKey) Localized(acceptLanguage string) *APIKey {
 	return k
 }
 
-// Localized 本地化兑换码关联分组并返回自身。
-func (r *RedeemCode) Localized(acceptLanguage string) *RedeemCode {
-	if r != nil {
-		r.Group.Localized(acceptLanguage)
-	}
-	return r
-}
-
 // Localized 本地化使用记录关联的分组（含其 API Key 与订阅各自携带的分组）并返回自身。
 func (l *UsageLog) Localized(acceptLanguage string) *UsageLog {
 	if l != nil {
 		l.Group.Localized(acceptLanguage)
 		l.APIKey.Localized(acceptLanguage)
-		l.Subscription.Localized(acceptLanguage)
 	}
 	return l
-}
-
-// Localized 本地化订阅关联分组并返回自身。
-func (s *UserSubscription) Localized(acceptLanguage string) *UserSubscription {
-	if s != nil {
-		s.Group.Localized(acceptLanguage)
-	}
-	return s
 }

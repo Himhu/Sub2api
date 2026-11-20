@@ -46,11 +46,6 @@ describe('ops locale key completeness', () => {
 })
 
 describe('groups locale key completeness', () => {
-  it('en locale has admin.groups.failedToSave', () => {
-    const enKeys = flattenKeys(en)
-    expect(enKeys).toContain('admin.groups.failedToSave')
-  })
-
   const webSearchPricingKeys = [
     'admin.groups.webSearchPricing.title',
     'admin.groups.webSearchPricing.pricePerCall',

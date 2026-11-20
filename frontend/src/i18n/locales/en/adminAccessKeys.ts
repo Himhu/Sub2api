@@ -194,26 +194,6 @@ export default {
       "label": "Read site-wide business reports",
       "category": "Reports"
     },
-    "users_dread": {
-      "label": "Read all user profiles (including contact details)",
-      "category": "Users"
-    },
-    "users_dbalance_dread": {
-      "label": "Read all user balances and transaction history",
-      "category": "Finance"
-    },
-    "users_dbalance_dwrite": {
-      "label": "Add or subtract any user balance",
-      "category": "Finance"
-    },
-    "users_dquotas_dread": {
-      "label": "Read all user platform quotas",
-      "category": "Users"
-    },
-    "users_dquotas_dwrite": {
-      "label": "Change and reset all user platform quotas",
-      "category": "Users"
-    },
     "groups_dread": {
       "label": "Read all group configurations",
       "category": "Groups"
@@ -221,78 +201,6 @@ export default {
     "usage_dread": {
       "label": "Read site-wide usage details and user usage",
       "category": "Reports"
-    },
-    "payment_dread": {
-      "label": "Read all payment orders and reports",
-      "category": "Finance"
-    },
-    "payment_dcancel": {
-      "label": "Cancel payment orders",
-      "category": "Finance"
-    },
-    "payment_dfulfill": {
-      "label": "Retry payment order fulfillment",
-      "category": "Finance"
-    },
-    "payment_drefund": {
-      "label": "Issue refunds and confirm refund results",
-      "category": "Finance"
-    },
-    "payment_dplans_dread": {
-      "label": "Read all payment plans",
-      "category": "Finance"
-    },
-    "payment_dplans_dwrite": {
-      "label": "Create, edit, and delete payment plans",
-      "category": "Finance"
-    },
-    "subscriptions_dread": {
-      "label": "Read all subscription records",
-      "category": "Subscriptions"
-    },
-    "subscriptions_dassign": {
-      "label": "Assign subscriptions to any user",
-      "category": "Subscriptions"
-    },
-    "subscriptions_dextend": {
-      "label": "Extend subscription expiration",
-      "category": "Subscriptions"
-    },
-    "subscriptions_drevoke": {
-      "label": "Revoke subscriptions",
-      "category": "Subscriptions"
-    },
-    "subscriptions_drestore": {
-      "label": "Restore subscriptions",
-      "category": "Subscriptions"
-    },
-    "subscriptions_dreset": {
-      "label": "Reset subscription quota",
-      "category": "Subscriptions"
-    },
-    "announcements_dread": {
-      "label": "Read all announcements and read receipts",
-      "category": "Content"
-    },
-    "announcements_dwrite": {
-      "label": "Create, publish, and edit announcements",
-      "category": "Content"
-    },
-    "announcements_ddelete": {
-      "label": "Delete announcements",
-      "category": "Content"
-    },
-    "promo_dread": {
-      "label": "Read promotion codes and usage records",
-      "category": "Finance"
-    },
-    "promo_dwrite": {
-      "label": "Create and edit promotion code benefits",
-      "category": "Finance"
-    },
-    "promo_ddelete": {
-      "label": "Delete promotion codes",
-      "category": "Finance"
     },
     "ops_dread": {
       "label": "Read site-wide operational metrics",
@@ -313,10 +221,6 @@ export default {
     "ops_dalerts_dwrite": {
       "label": "Change alert rules, status, and silences",
       "category": "Monitoring"
-    },
-    "system_dread": {
-      "label": "Read current and available system versions",
-      "category": "System"
     }
   },
   "listSeparator": ", "

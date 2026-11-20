@@ -10,8 +10,6 @@ import {
   setPlatformCatalog
 } from '@/constants/platformCatalog'
 import { platformLabel } from '@/utils/platformColors'
-import { normalizePlatformQuotasMap, sanitizePlatformQuotasMap } from '@/api/admin/settings'
-import { platformQuotaPlatforms } from '@/api/admin/users'
 
 // 改为读取平台清单之前的平台字面量，加上之后内置登记的 Command Code。
 const concretePlatforms = [
@@ -71,7 +69,7 @@ describe('platform catalog with a newly registered platform', () => {
     expect(platformLabel('')).toBe('API')
   })
 
-  it('adds newly registered platforms to options, labels and quota lists reactively', () => {
+  it('adds newly registered platforms to options and labels reactively', () => {
     const optionValues = computed(() => CONCRETE_PLATFORM_OPTIONS.map((option) => option.value))
     expect(optionValues.value).not.toContain('acme_router')
 
@@ -86,13 +84,6 @@ describe('platform catalog with a newly registered platform', () => {
     expect(platformLabel('acme_router')).toBe('Acme Router')
     expect(platformDisplayName('acme_router')).toBe('Acme Router')
     expect(platformLabel('unregistered')).toBe('unregistered')
-    expect(platformQuotaPlatforms()).toContain('acme_router')
-    expect(Object.keys(normalizePlatformQuotasMap())).toEqual([...concretePlatforms, 'acme_router'])
-    expect(sanitizePlatformQuotasMap({ acme_router: { daily: 5, weekly: -1, monthly: null } }).acme_router).toEqual({
-      daily: 5,
-      weekly: null,
-      monthly: null
-    })
   })
 
   it('restores the built-in catalog on reset', () => {

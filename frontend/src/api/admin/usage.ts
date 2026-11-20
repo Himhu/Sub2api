@@ -26,12 +26,6 @@ export interface AdminUsageStatsResponse {
   endpoint_paths?: EndpointStat[]
 }
 
-export interface SimpleUser {
-  id: number
-  email: string
-  deleted: boolean
-}
-
 export interface SimpleApiKey {
   id: number
   name: string
@@ -69,7 +63,6 @@ export interface UsageCleanupTask {
 export interface CreateUsageCleanupTaskRequest {
   start_date: string
   end_date: string
-  user_id?: number
   api_key_id?: number
   account_id?: number
   group_id?: number
@@ -81,7 +74,6 @@ export interface CreateUsageCleanupTaskRequest {
 }
 
 export interface AdminUsageQueryParams extends UsageQueryParams {
-  user_id?: number
   exact_total?: boolean
   billing_mode?: string
   upstream_model_mismatch?: boolean
@@ -117,7 +109,6 @@ export async function list(
  * @returns Usage statistics
  */
 export async function getStats(params: {
-  user_id?: number
   api_key_id?: number
   account_id?: number
   group_id?: number
@@ -139,28 +130,12 @@ export async function getStats(params: {
 }
 
 /**
- * Search users by email keyword (admin only)
- * @param keyword - Email keyword to search
- * @returns List of matching users (max 30)
- */
-export async function searchUsers(keyword: string): Promise<SimpleUser[]> {
-  const { data } = await apiClient.get<SimpleUser[]>('/admin/usage/search-users', {
-    params: { q: keyword }
-  })
-  return data
-}
-
-/**
- * Search API keys by user ID and/or keyword (admin only)
- * @param userId - Optional user ID to filter by
+ * Search API keys by keyword (admin only)
  * @param keyword - Optional keyword to search in key name
  * @returns List of matching API keys (max 30)
  */
-export async function searchApiKeys(userId?: number, keyword?: string): Promise<SimpleApiKey[]> {
+export async function searchApiKeys(keyword?: string): Promise<SimpleApiKey[]> {
   const params: Record<string, unknown> = {}
-  if (userId !== undefined) {
-    params.user_id = userId
-  }
   if (keyword) {
     params.q = keyword
   }
@@ -210,7 +185,6 @@ export async function cancelCleanupTask(taskId: number): Promise<{ id: number; s
 export const adminUsageAPI = {
   list,
   getStats,
-  searchUsers,
   searchApiKeys,
   listCleanupTasks,
   createCleanupTask,

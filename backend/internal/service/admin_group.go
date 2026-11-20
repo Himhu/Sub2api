@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -1233,31 +1232,17 @@ func (s *adminServiceImpl) deleteGroup(ctx context.Context, id int64, requireEmp
 		}
 	}
 
-	var affectedUserIDs []int64
 	var err error
 	if requireEmpty {
-		affectedUserIDs, err = s.emptyGroupDeleteRepo.DeleteCascadeIfEmpty(ctx, id)
+		_, err = s.emptyGroupDeleteRepo.DeleteCascadeIfEmpty(ctx, id)
 	} else {
-		affectedUserIDs, err = s.groupRepo.DeleteCascade(ctx, id)
+		_, err = s.groupRepo.DeleteCascade(ctx, id)
 	}
 	if err != nil {
 		return err
 	}
 	// 注意：user_group_rate_multipliers 表通过外键 ON DELETE CASCADE 自动清理
 
-	// 事务成功后，异步失效受影响用户的订阅缓存
-	if len(affectedUserIDs) > 0 && s.billingCacheService != nil {
-		groupID := id
-		go func() {
-			cacheCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-			for _, userID := range affectedUserIDs {
-				if err := s.billingCacheService.InvalidateSubscription(cacheCtx, userID, groupID); err != nil {
-					logger.LegacyPrintf("service.admin", "invalidate subscription cache failed: user_id=%d group_id=%d err=%v", userID, groupID, err)
-				}
-			}
-		}()
-	}
 	if s.authCacheInvalidator != nil {
 		for _, key := range groupKeys {
 			s.authCacheInvalidator.InvalidateAuthCacheByKey(ctx, key)
@@ -1388,18 +1373,6 @@ func (s *adminServiceImpl) AdminUpdateAPIKeyGroupID(ctx context.Context, keyID i
 		}
 		if group.Status != StatusActive {
 			return nil, infraerrors.BadRequest("GROUP_NOT_ACTIVE", "target group is not active")
-		}
-		// 订阅类型分组：用户须持有该分组的有效订阅才可绑定
-		if group.IsSubscriptionType() {
-			if s.userSubRepo == nil {
-				return nil, infraerrors.InternalServer("SUBSCRIPTION_REPOSITORY_UNAVAILABLE", "subscription repository is not configured")
-			}
-			if _, err := s.userSubRepo.GetActiveByUserIDAndGroupID(ctx, apiKey.UserID, *groupID); err != nil {
-				if errors.Is(err, ErrSubscriptionNotFound) {
-					return nil, infraerrors.BadRequest("SUBSCRIPTION_REQUIRED", "user does not have an active subscription for this group")
-				}
-				return nil, err
-			}
 		}
 
 		gid := *groupID

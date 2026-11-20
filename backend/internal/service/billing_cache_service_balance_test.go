@@ -41,25 +41,15 @@ func (s *balanceEligibilityCacheStub) InvalidateUserBalance(context.Context, int
 	return nil
 }
 
-func TestCheckBillingEligibility_RejectsBalanceBelowMinimumReserve(t *testing.T) {
-	cache := &balanceEligibilityCacheStub{balance: 0.005}
+// 自托管裁剪后 CheckBillingEligibility 不再按余额拦截请求（余额仅用于扣费记账）。
+func TestCheckBillingEligibility_DoesNotGateOnBalance(t *testing.T) {
+	cache := &balanceEligibilityCacheStub{balance: 0}
 	cfg := &config.Config{}
 	cfg.Billing.MinimumBalanceReserve = 0.01
-	svc := NewBillingCacheService(cache, nil, nil, nil, nil, nil, cfg, nil)
+	svc := NewBillingCacheService(cache, nil, nil, nil, nil, cfg, nil)
 	t.Cleanup(svc.Stop)
 
-	err := svc.CheckBillingEligibility(context.Background(), &User{ID: 1}, nil, nil, nil, "")
-	require.ErrorIs(t, err, ErrInsufficientBalance)
-}
-
-func TestCheckBillingEligibility_AllowsBalanceAtMinimumReserve(t *testing.T) {
-	cache := &balanceEligibilityCacheStub{balance: 0.01}
-	cfg := &config.Config{}
-	cfg.Billing.MinimumBalanceReserve = 0.01
-	svc := NewBillingCacheService(cache, nil, nil, nil, nil, nil, cfg, nil)
-	t.Cleanup(svc.Stop)
-
-	err := svc.CheckBillingEligibility(context.Background(), &User{ID: 1}, nil, nil, nil, "")
+	err := svc.CheckBillingEligibility(context.Background(), &User{ID: 1}, nil, nil, "")
 	require.NoError(t, err)
 }
 
@@ -71,7 +61,7 @@ func TestSyncBalanceCacheAfterDeduction_InvalidatesExhaustedBalance(t *testing.T
 	userRepo := &balanceLoadUserRepoStub{balance: -0.25}
 	cfg := &config.Config{}
 	cfg.Billing.MinimumBalanceReserve = 0.01
-	svc := NewBillingCacheService(cache, userRepo, nil, nil, nil, nil, cfg, nil)
+	svc := NewBillingCacheService(cache, userRepo, nil, nil, nil, cfg, nil)
 	t.Cleanup(svc.Stop)
 
 	newBalance := -0.25
@@ -85,34 +75,13 @@ func TestSyncBalanceCacheAfterDeduction_InvalidatesExhaustedBalance(t *testing.T
 
 	require.Equal(t, int64(1), cache.invalidateCalls.Load())
 	require.Equal(t, int64(0), cache.deductCalls.Load())
-
-	err := svc.CheckBillingEligibility(context.Background(), &User{ID: 1}, nil, nil, nil, "")
-	require.ErrorIs(t, err, ErrInsufficientBalance)
-	require.Equal(t, int64(1), userRepo.calls.Load())
-}
-
-func TestSyncBalanceCacheAfterDeduction_InvalidatesWhenBalanceFallsBelowReserve(t *testing.T) {
-	cache := &balanceEligibilityCacheStub{balance: 0.50}
-	cfg := &config.Config{}
-	cfg.Billing.MinimumBalanceReserve = 0.01
-	svc := NewBillingCacheService(cache, nil, nil, nil, nil, nil, cfg, nil)
-	t.Cleanup(svc.Stop)
-
-	newBalance := 0.005
-	syncBalanceCacheAfterDeduction(context.Background(), &postUsageBillingParams{
-		Cost: &CostBreakdown{ActualCost: 0.495},
-		User: &User{ID: 1},
-	}, &billingDeps{billingCacheService: svc}, &UsageBillingApplyResult{NewBalance: &newBalance})
-
-	require.Equal(t, int64(1), cache.invalidateCalls.Load())
-	require.Equal(t, int64(0), cache.deductCalls.Load())
 }
 
 func TestSyncBalanceCacheAfterDeduction_QueuesDeductWhenBalanceStillEligible(t *testing.T) {
 	cache := &balanceEligibilityCacheStub{balance: 1}
 	cfg := &config.Config{}
 	cfg.Billing.MinimumBalanceReserve = 0.01
-	svc := NewBillingCacheService(cache, nil, nil, nil, nil, nil, cfg, nil)
+	svc := NewBillingCacheService(cache, nil, nil, nil, nil, cfg, nil)
 	t.Cleanup(svc.Stop)
 
 	newBalance := 0.75

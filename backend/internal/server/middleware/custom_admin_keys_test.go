@@ -35,7 +35,7 @@ func TestScopedAdminKeyAuthDefaultDenyAndCreatorStatus(t *testing.T) {
 	repo := &adminAuthKeyRepo{}
 	settings := service.NewSettingService(nil, nil)
 	settings.SetScopedAdminKeyRepository(repo)
-	key, _, err := settings.CreateScopedAdminKey(context.Background(), service.ScopedAdminKeyInput{Name: "只读", Enabled: true, Policy: adminaccess.Policy{GlobalPermissions: []string{"users.read"}}}, 9)
+	key, _, err := settings.CreateScopedAdminKey(context.Background(), service.ScopedAdminKeyInput{Name: "只读", Enabled: true, Policy: adminaccess.Policy{GlobalPermissions: []string{"proxies.read"}}}, 9)
 	require.NoError(t, err)
 	active := true
 	users := service.NewUserService(&stubUserRepo{getByID: func(context.Context, int64) (*service.User, error) {
@@ -47,13 +47,13 @@ func TestScopedAdminKeyAuthDefaultDenyAndCreatorStatus(t *testing.T) {
 	}}, nil, nil, nil)
 	r := gin.New()
 	r.Use(gin.HandlerFunc(NewAdminAuthMiddleware(nil, users, settings, nil)))
-	for _, path := range []string{"/api/v1/admin/users", "/api/v1/admin/unknown", "/api/v1/admin/settings/admin-api-keys"} {
+	for _, path := range []string{"/api/v1/admin/proxies", "/api/v1/admin/unknown", "/api/v1/admin/settings/admin-api-keys"} {
 		r.GET(path, func(c *gin.Context) { c.Status(204) })
 	}
 	for _, tc := range []struct {
 		path   string
 		status int
-	}{{"/api/v1/admin/users", 204}, {"/api/v1/admin/unknown", 403}, {"/api/v1/admin/settings/admin-api-keys", 403}} {
+	}{{"/api/v1/admin/proxies", 204}, {"/api/v1/admin/unknown", 403}, {"/api/v1/admin/settings/admin-api-keys", 403}} {
 		req := httptest.NewRequest("GET", tc.path, nil)
 		req.Header.Set("x-api-key", key)
 		w := httptest.NewRecorder()
@@ -61,7 +61,7 @@ func TestScopedAdminKeyAuthDefaultDenyAndCreatorStatus(t *testing.T) {
 		require.Equal(t, tc.status, w.Code, tc.path)
 	}
 	active = false
-	req := httptest.NewRequest("GET", "/api/v1/admin/users", nil)
+	req := httptest.NewRequest("GET", "/api/v1/admin/proxies", nil)
 	req.Header.Set("x-api-key", key)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -108,8 +108,8 @@ func TestScopedAdminKeyAuditDenialOmitsSecrets(t *testing.T) {
 func TestScopedAdminKeyMissingDependenciesFailClosed(t *testing.T) {
 	r := gin.New()
 	r.Use(gin.HandlerFunc(NewAdminAuthMiddleware(nil, nil, nil, nil)))
-	r.GET("/api/v1/admin/users", func(c *gin.Context) { t.Fatal("不应执行") })
-	req := httptest.NewRequest("GET", "/api/v1/admin/users", nil)
+	r.GET("/api/v1/admin/proxies", func(c *gin.Context) { t.Fatal("不应执行") })
+	req := httptest.NewRequest("GET", "/api/v1/admin/proxies", nil)
 	req.Header.Set("x-api-key", "adm_sc_invalid")
 	w := httptest.NewRecorder()
 	require.NotPanics(t, func() { r.ServeHTTP(w, req) })

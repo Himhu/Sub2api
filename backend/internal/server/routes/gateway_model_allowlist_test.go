@@ -38,7 +38,6 @@ func newGatewayRoutesTestRouterWithGroup(group *service.Group) *gin.Engine {
 		nil,
 		nil,
 		nil,
-		nil,
 		&config.Config{
 			Gateway: config.GatewayConfig{
 				MaxBodySize:     1024 * 1024,
@@ -80,9 +79,9 @@ func TestGatewayRoutesGroupModelAllowlistMountedOnEveryGatewayRoute(t *testing.T
 		composite string
 	}{
 		{group: "gateway", auth: "gin.HandlerFunc(apiKeyAuth)", marker: "gateway.Use(groupModelAllowlist)", composite: "gateway.Use(compositeTarget)"},
-		{group: "gemini", auth: "middleware.APIKeyAuthWithSubscriptionGoogle(apiKeyService, subscriptionService, cfg)", marker: "gemini.Use(groupModelAllowlist)", composite: "gemini.Use(compositeGeminiTarget)"},
+		{group: "gemini", auth: "middleware.APIKeyAuthGoogle(apiKeyService, cfg)", marker: "gemini.Use(groupModelAllowlist)", composite: "gemini.Use(compositeGeminiTarget)"},
 		{group: "antigravityV1", auth: "gin.HandlerFunc(apiKeyAuth)", marker: "antigravityV1.Use(groupModelAllowlist)", composite: "antigravityV1.Use(requireGroupAnthropic)"},
-		{group: "antigravityV1Beta", auth: "middleware.APIKeyAuthWithSubscriptionGoogle(apiKeyService, subscriptionService, cfg)", marker: "antigravityV1Beta.Use(groupModelAllowlist)", composite: "antigravityV1Beta.Use(requireGroupGoogle)"},
+		{group: "antigravityV1Beta", auth: "middleware.APIKeyAuthGoogle(apiKeyService, cfg)", marker: "antigravityV1Beta.Use(groupModelAllowlist)", composite: "antigravityV1Beta.Use(requireGroupGoogle)"},
 	}
 	for _, chain := range chains {
 		re := regexp.MustCompile(

@@ -121,7 +121,6 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 		service.BindErrorPassthroughService(c, h.errorPassthroughService)
 	}
 
-	subscription, _ := middleware2.GetSubscriptionFromContext(c)
 	requestPlatform := openAICompatibleRequestPlatform(c.Request.Context(), apiKey)
 
 	service.SetOpsLatencyMs(c, service.OpsAuthLatencyMsKey, time.Since(requestStart).Milliseconds())
@@ -135,7 +134,7 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 		defer userReleaseFunc()
 	}
 
-	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, subscription, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
+	if err := h.billingCacheService.CheckBillingEligibility(c.Request.Context(), apiKey.User, apiKey, apiKey.Group, service.QuotaPlatform(c.Request.Context(), apiKey)); err != nil {
 		reqLog.Info("openai_chat_completions.billing_eligibility_check_failed", zap.Error(err))
 		status, code, message, retryAfter := billingErrorDetails(err)
 		if retryAfter > 0 {
@@ -146,7 +145,7 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 	}
 
 	// 余额模式在途预留：防止并发请求在预检时看到同一份余额而集体透支。
-	inflightRelease, err := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, subscription, tokenInflightEstimate(reqModel, body))
+	inflightRelease, err := reserveInflightBalance(c, h.billingCacheService, h.gatewayService, apiKey, tokenInflightEstimate(reqModel, body))
 	if err != nil {
 		reqLog.Info("openai_chat_completions.inflight_reservation_rejected", zap.Error(err))
 		status, code, message, retryAfter := billingErrorDetails(err)
@@ -265,7 +264,7 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 		if service.GetOpsCyberPolicy(c) != nil {
 			cyberBlockBodyChat = body
 		}
-		h.recordCyberPolicyIfMarked(c, apiKey, account, subscription, reqModel, err != nil, cyberBlockBodyChat, clientRequestedUsageFields(c, channelMapping, reqModel, ""), service.HashUsageRequestPayload(body))
+		h.recordCyberPolicyIfMarked(c, apiKey, account, reqModel, err != nil, cyberBlockBodyChat, clientRequestedUsageFields(c, channelMapping, reqModel, ""), service.HashUsageRequestPayload(body))
 
 		forwardDurationMs := time.Since(forwardStart).Milliseconds()
 		upstreamLatencyMs, _ := getContextInt64(c, service.OpsUpstreamLatencyMsKey)
@@ -298,7 +297,6 @@ func (h *OpenAIGatewayHandler) ChatCompletions(c *gin.Context) {
 					APIKey:             apiKey,
 					User:               apiKey.User,
 					Account:            account,
-					Subscription:       subscription,
 					InboundEndpoint:    inboundEndpoint,
 					UpstreamEndpoint:   upstreamEndpoint,
 					UserAgent:          userAgent,

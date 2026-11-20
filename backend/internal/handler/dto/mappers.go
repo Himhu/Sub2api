@@ -2,7 +2,6 @@
 package dto
 
 import (
-	"strconv"
 	"strings"
 	"time"
 
@@ -14,25 +13,21 @@ func UserFromServiceShallow(u *service.User) *User {
 		return nil
 	}
 	return &User{
-		ID:                         u.ID,
-		Email:                      u.Email,
-		Username:                   u.Username,
-		Role:                       u.Role,
-		Balance:                    u.Balance,
-		FrozenBalance:              u.FrozenBalance,
-		Concurrency:                u.Concurrency,
-		Status:                     u.Status,
-		AllowedGroups:              u.AllowedGroups,
-		LastActiveAt:               u.LastActiveAt,
-		CreatedAt:                  u.CreatedAt,
-		UpdatedAt:                  u.UpdatedAt,
-		BalanceNotifyEnabled:       u.BalanceNotifyEnabled,
-		BalanceNotifyThresholdType: u.BalanceNotifyThresholdType,
-		BalanceNotifyThreshold:     u.BalanceNotifyThreshold,
-		BalanceNotifyExtraEmails:   NotifyEmailEntriesFromService(u.BalanceNotifyExtraEmails),
-		TotalRecharged:             u.TotalRecharged,
-		RPMLimit:                   u.RPMLimit,
-		DeletedAt:                  u.DeletedAt,
+		ID:             u.ID,
+		Email:          u.Email,
+		Username:       u.Username,
+		Role:           u.Role,
+		Balance:        u.Balance,
+		FrozenBalance:  u.FrozenBalance,
+		Concurrency:    u.Concurrency,
+		Status:         u.Status,
+		AllowedGroups:  u.AllowedGroups,
+		LastActiveAt:   u.LastActiveAt,
+		CreatedAt:      u.CreatedAt,
+		UpdatedAt:      u.UpdatedAt,
+		TotalRecharged: u.TotalRecharged,
+		RPMLimit:       u.RPMLimit,
+		DeletedAt:      u.DeletedAt,
 	}
 }
 
@@ -46,13 +41,6 @@ func UserFromService(u *service.User) *User {
 		for i := range u.APIKeys {
 			k := u.APIKeys[i]
 			out.APIKeys = append(out.APIKeys, *APIKeyFromService(&k))
-		}
-	}
-	if len(u.Subscriptions) > 0 {
-		out.Subscriptions = make([]UserSubscription, 0, len(u.Subscriptions))
-		for i := range u.Subscriptions {
-			s := u.Subscriptions[i]
-			out.Subscriptions = append(out.Subscriptions, *UserSubscriptionFromService(&s))
 		}
 	}
 	return out
@@ -392,25 +380,6 @@ func AccountFromServiceShallow(a *service.Account) *Account {
 			}
 		}
 
-		// 配额通知配置
-		if enabled := a.GetQuotaNotifyDailyEnabled(); enabled {
-			out.QuotaNotifyDailyEnabled = &enabled
-		}
-		if threshold := a.GetQuotaNotifyDailyThreshold(); threshold > 0 {
-			out.QuotaNotifyDailyThreshold = &threshold
-		}
-		if enabled := a.GetQuotaNotifyWeeklyEnabled(); enabled {
-			out.QuotaNotifyWeeklyEnabled = &enabled
-		}
-		if threshold := a.GetQuotaNotifyWeeklyThreshold(); threshold > 0 {
-			out.QuotaNotifyWeeklyThreshold = &threshold
-		}
-		if enabled := a.GetQuotaNotifyTotalEnabled(); enabled {
-			out.QuotaNotifyTotalEnabled = &enabled
-		}
-		if threshold := a.GetQuotaNotifyTotalThreshold(); threshold > 0 {
-			out.QuotaNotifyTotalThreshold = &threshold
-		}
 	}
 
 	return out
@@ -489,10 +458,6 @@ func AccountListItemFromAccount(a *Account) *AccountListItem {
 		QuotaDailyResetHour: a.QuotaDailyResetHour, QuotaWeeklyResetMode: a.QuotaWeeklyResetMode,
 		QuotaWeeklyResetDay: a.QuotaWeeklyResetDay, QuotaWeeklyResetHour: a.QuotaWeeklyResetHour,
 		QuotaResetTimezone: a.QuotaResetTimezone, QuotaDailyResetAt: a.QuotaDailyResetAt,
-		QuotaWeeklyResetAt: a.QuotaWeeklyResetAt, QuotaNotifyDailyEnabled: a.QuotaNotifyDailyEnabled,
-		QuotaNotifyDailyThreshold: a.QuotaNotifyDailyThreshold, QuotaNotifyWeeklyEnabled: a.QuotaNotifyWeeklyEnabled,
-		QuotaNotifyWeeklyThreshold: a.QuotaNotifyWeeklyThreshold, QuotaNotifyTotalEnabled: a.QuotaNotifyTotalEnabled,
-		QuotaNotifyTotalThreshold: a.QuotaNotifyTotalThreshold, ParentAccountID: a.ParentAccountID,
 		QuotaDimension: a.QuotaDimension, ParentEmail: a.ParentEmail, ParentPlanType: a.ParentPlanType,
 		ParentPrivacyMode: a.ParentPrivacyMode, ParentSubscriptionExpiresAt: a.ParentSubscriptionExpiresAt,
 		ParentChatGPTAccountID: a.ParentChatGPTAccountID, Proxy: a.Proxy, GroupIDs: a.GroupIDs,
@@ -623,55 +588,6 @@ func ProxyAccountSummaryFromService(a *service.ProxyAccountSummary) *ProxyAccoun
 	}
 }
 
-func RedeemCodeFromService(rc *service.RedeemCode) *RedeemCode {
-	if rc == nil {
-		return nil
-	}
-	out := redeemCodeFromServiceBase(rc)
-	return &out
-}
-
-// RedeemCodeFromServiceAdmin converts a service RedeemCode to DTO for admin users.
-// It includes notes - user-facing endpoints must not use this.
-func RedeemCodeFromServiceAdmin(rc *service.RedeemCode) *AdminRedeemCode {
-	if rc == nil {
-		return nil
-	}
-	return &AdminRedeemCode{
-		RedeemCode: redeemCodeFromServiceBase(rc),
-		Notes:      rc.Notes,
-	}
-}
-
-func redeemCodeFromServiceBase(rc *service.RedeemCode) RedeemCode {
-	out := RedeemCode{
-		ID:           rc.ID,
-		Code:         rc.Code,
-		Type:         rc.Type,
-		Value:        rc.Value,
-		Status:       rc.Status,
-		UsedBy:       rc.UsedBy,
-		UsedAt:       rc.UsedAt,
-		CreatedAt:    rc.CreatedAt,
-		ExpiresAt:    rc.ExpiresAt,
-		GroupID:      rc.GroupID,
-		ValidityDays: rc.ValidityDays,
-		User:         UserFromServiceShallow(rc.User),
-		Group:        GroupFromServiceShallow(rc.Group),
-	}
-	if rc.IsExpired() {
-		out.Status = service.StatusExpired
-	}
-
-	// For admin_balance/admin_concurrency types, include notes so users can see
-	// why they were charged or credited by admin
-	if (rc.Type == "admin_balance" || rc.Type == "admin_concurrency") && rc.Notes != "" {
-		out.Notes = &rc.Notes
-	}
-
-	return out
-}
-
 // AccountSummaryFromService returns a minimal AccountSummary for usage log display.
 // Only includes ID and Name - no sensitive fields like Credentials, Proxy, etc.
 func AccountSummaryFromService(a *service.Account) *AccountSummary {
@@ -747,7 +663,6 @@ func usageLogFromServiceUser(l *service.UsageLog) UsageLog {
 		User:                      UserFromServiceShallow(l.User),
 		APIKey:                    APIKeyFromService(l.APIKey),
 		Group:                     GroupFromServiceShallow(l.Group),
-		Subscription:              UserSubscriptionFromService(l.Subscription),
 	}
 }
 
@@ -866,105 +781,5 @@ func SettingFromService(s *service.Setting) *Setting {
 		Key:       s.Key,
 		Value:     s.Value,
 		UpdatedAt: s.UpdatedAt,
-	}
-}
-
-func UserSubscriptionFromService(sub *service.UserSubscription) *UserSubscription {
-	if sub == nil {
-		return nil
-	}
-	out := userSubscriptionFromServiceBase(sub)
-	return &out
-}
-
-// UserSubscriptionFromServiceAdmin converts a service UserSubscription to DTO for admin users.
-// It includes assignment metadata and notes.
-func UserSubscriptionFromServiceAdmin(sub *service.UserSubscription) *AdminUserSubscription {
-	if sub == nil {
-		return nil
-	}
-	return &AdminUserSubscription{
-		UserSubscription: userSubscriptionFromServiceBase(sub),
-		AssignedBy:       sub.AssignedBy,
-		AssignedAt:       sub.AssignedAt,
-		Notes:            sub.Notes,
-		AssignedByUser:   UserFromServiceShallow(sub.AssignedByUser),
-	}
-}
-
-func userSubscriptionFromServiceBase(sub *service.UserSubscription) UserSubscription {
-	return UserSubscription{
-		ID:                 sub.ID,
-		UserID:             sub.UserID,
-		GroupID:            sub.GroupID,
-		StartsAt:           sub.StartsAt,
-		ExpiresAt:          sub.ExpiresAt,
-		Status:             sub.Status,
-		DailyWindowStart:   sub.DailyWindowStart,
-		WeeklyWindowStart:  sub.WeeklyWindowStart,
-		MonthlyWindowStart: sub.MonthlyWindowStart,
-		DailyUsageUSD:      sub.DailyUsageUSD,
-		WeeklyUsageUSD:     sub.WeeklyUsageUSD,
-		MonthlyUsageUSD:    sub.MonthlyUsageUSD,
-		CreatedAt:          sub.CreatedAt,
-		UpdatedAt:          sub.UpdatedAt,
-		RevokedAt:          sub.DeletedAt,
-		User:               UserFromServiceShallow(sub.User),
-		Group:              GroupFromServiceShallow(sub.Group),
-	}
-}
-
-func BulkAssignResultFromService(r *service.BulkAssignResult) *BulkAssignResult {
-	if r == nil {
-		return nil
-	}
-	subs := make([]AdminUserSubscription, 0, len(r.Subscriptions))
-	for i := range r.Subscriptions {
-		subs = append(subs, *UserSubscriptionFromServiceAdmin(&r.Subscriptions[i]))
-	}
-	statuses := make(map[string]string, len(r.Statuses))
-	for userID, status := range r.Statuses {
-		statuses[strconv.FormatInt(userID, 10)] = status
-	}
-	return &BulkAssignResult{
-		SuccessCount:  r.SuccessCount,
-		CreatedCount:  r.CreatedCount,
-		ReusedCount:   r.ReusedCount,
-		FailedCount:   r.FailedCount,
-		Subscriptions: subs,
-		Errors:        r.Errors,
-		Statuses:      statuses,
-	}
-}
-
-func PromoCodeFromService(pc *service.PromoCode) *PromoCode {
-	if pc == nil {
-		return nil
-	}
-	return &PromoCode{
-		ID:          pc.ID,
-		Code:        pc.Code,
-		BonusAmount: pc.BonusAmount,
-		MaxUses:     pc.MaxUses,
-		UsedCount:   pc.UsedCount,
-		Status:      pc.Status,
-		ExpiresAt:   pc.ExpiresAt,
-		Notes:       pc.Notes,
-		CreatedAt:   pc.CreatedAt,
-		UpdatedAt:   pc.UpdatedAt,
-	}
-}
-
-func PromoCodeUsageFromService(u *service.PromoCodeUsage) *PromoCodeUsage {
-	if u == nil {
-		return nil
-	}
-	return &PromoCodeUsage{
-		ID:          u.ID,
-		PromoCodeID: u.PromoCodeID,
-		UserID:      u.UserID,
-		BonusAmount: u.BonusAmount,
-		UsedAt:      u.UsedAt,
-		User:        UserFromServiceShallow(u.User),
 	}
 }

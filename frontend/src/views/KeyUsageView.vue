@@ -212,12 +212,6 @@
                     </defs>
                   </svg>
                   <div class="absolute inset-0 flex flex-col items-center justify-center">
-                    <template v-if="ring.isBalance">
-                      <span class="text-2xl font-bold tabular-nums" :style="{ color: RING_GRADIENTS[i % 4].from }">
-                        {{ ring.amount }}
-                      </span>
-                    </template>
-                    <template v-else>
                       <span class="text-3xl font-bold tabular-nums text-gray-900 dark:text-white">
                         {{ displayPcts[i] ?? 0 }}%
                       </span>
@@ -229,7 +223,6 @@
                       <p v-if="ring.resetAt && formatResetTime(ring.resetAt)" class="text-xs text-gray-400 dark:text-gray-500 mt-0.5 tabular-nums">
                         ⟳ {{ formatResetTime(ring.resetAt) }}
                       </p>
-                    </template>
                   </div>
                 </div>
               </div>
@@ -420,7 +413,6 @@
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useAppStore } from '@/stores'
-import { FeatureFlags, resolveFeatureFlag } from '@/utils/featureFlags'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 import Icon from '@/components/icons/Icon.vue'
 import { buildGatewayUrl } from '@/api/client'
@@ -429,7 +421,6 @@ import { sanitizeUrl } from '@/utils/url'
 
 const { t, locale } = useI18n()
 const appStore = useAppStore()
-const subscriptionFeatureEnabled = computed(() => resolveFeatureFlag(appStore.cachedPublicSettings, FeatureFlags.subscription))
 
 // ==================== Site Settings (same as HomeView) ====================
 
@@ -544,14 +535,12 @@ interface RingItem {
   title: string
   pct: number
   amount: string
-  isBalance?: boolean
   iconType: 'clock' | 'calendar' | 'dollar'
   resetAt?: string | null
 }
 
 function getRingOffset(ring: RingItem): number {
   if (!ringAnimated.value) return CIRCUMFERENCE
-  if (ring.isBalance) return 0
   return CIRCUMFERENCE - (Math.min(ring.pct, 100) / 100) * CIRCUMFERENCE
 }
 
@@ -567,7 +556,7 @@ function triggerRingAnimation(items: RingItem[]) {
         // Animate percentage numbers
         const duration = 1000
         const startTime = performance.now()
-        const targets = items.map(item => item.isBalance ? 0 : item.pct)
+        const targets = items.map(item => item.pct)
 
         function tick() {
           const elapsed = performance.now() - startTime
@@ -603,7 +592,7 @@ const statusInfo = computed(() => {
   }
 
   return {
-    label: data.planName || t('keyUsage.walletBalance'),
+    label: t('keyUsage.unlimited'),
     statusText: 'Active',
     isActive: true,
   }
@@ -633,24 +622,6 @@ const ringItems = computed<RingItem[]>(() => {
           resetAt: rl.reset_at,
         })
       }
-    }
-  } else {
-    if (data.subscription) {
-      const sub = data.subscription
-      const limits = [
-        { label: t('keyUsage.limitDaily'), usage: sub.daily_usage_usd, limit: sub.daily_limit_usd },
-        { label: t('keyUsage.limitWeekly'), usage: sub.weekly_usage_usd, limit: sub.weekly_limit_usd },
-        { label: t('keyUsage.limitMonthly'), usage: sub.monthly_usage_usd, limit: sub.monthly_limit_usd },
-      ]
-      for (const l of limits) {
-        if (l.limit != null && l.limit > 0) {
-          const pct = Math.min(Math.round((l.usage / l.limit) * 100), 100)
-          items.push({ title: l.label, pct, amount: `${usd(l.usage)} / ${usd(l.limit)}`, iconType: 'calendar' })
-        }
-      }
-    }
-    if (!data.subscription && data.balance != null) {
-      items.push({ title: t('keyUsage.walletBalance'), pct: 0, amount: usd(data.balance), isBalance: true, iconType: 'dollar' })
     }
   }
 
@@ -730,48 +701,8 @@ const detailRows = computed<DetailRow[]>(() => {
   } else {
     rows.push({
       iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-500', iconSvg: ICON_CHECK,
-      // 订阅功能关闭后这一行只会是「钱包余额」，标签改用不带「订阅」字样的「计费方式」。
-      label: subscriptionFeatureEnabled.value ? t('keyUsage.subscriptionType') : t('keyUsage.billingType'),
-      value: data.planName || t('keyUsage.walletBalance'), valueClass: '',
-    })
-
-    if (data.subscription) {
-      const sub = data.subscription
-      if (sub.daily_limit_usd > 0) {
-        const pct = (sub.daily_usage_usd / sub.daily_limit_usd) * 100
-        rows.push({
-          iconBg: 'bg-primary-500/10', iconColor: 'text-primary-500', iconSvg: ICON_DOLLAR,
-          label: `${t('keyUsage.usedQuota')} (${locale.value === 'zh' ? '日' : 'D'})`, value: `${usd(sub.daily_usage_usd)} / ${usd(sub.daily_limit_usd)}`, valueClass: getUsageColor(pct),
-        })
-      }
-      if (sub.weekly_limit_usd > 0) {
-        const pct = (sub.weekly_usage_usd / sub.weekly_limit_usd) * 100
-        rows.push({
-          iconBg: 'bg-indigo-500/10', iconColor: 'text-indigo-500', iconSvg: ICON_DOLLAR,
-          label: `${t('keyUsage.usedQuota')} (${locale.value === 'zh' ? '周' : 'W'})`, value: `${usd(sub.weekly_usage_usd)} / ${usd(sub.weekly_limit_usd)}`, valueClass: getUsageColor(pct),
-        })
-      }
-      if (sub.monthly_limit_usd > 0) {
-        const pct = (sub.monthly_usage_usd / sub.monthly_limit_usd) * 100
-        rows.push({
-          iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-500', iconSvg: ICON_DOLLAR,
-          label: `${t('keyUsage.usedQuota')} (${locale.value === 'zh' ? '月' : 'M'})`, value: `${usd(sub.monthly_usage_usd)} / ${usd(sub.monthly_limit_usd)}`, valueClass: getUsageColor(pct),
-        })
-      }
-      if (sub.expires_at) {
-        rows.push({
-          iconBg: 'bg-amber-500/10', iconColor: 'text-amber-500', iconSvg: ICON_CALENDAR,
-          label: t('keyUsage.subscriptionExpires'), value: formatDate(sub.expires_at), valueClass: '',
-        })
-      }
-    }
-
-    const remainColor = data.remaining != null
-      ? (data.remaining <= 0 ? 'text-rose-500' : data.remaining < 10 ? 'text-amber-500' : 'text-emerald-500')
-      : ''
-    rows.push({
-      iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-500', iconSvg: ICON_SHIELD,
-      label: t('keyUsage.remainingQuota'), value: data.remaining != null ? usd(data.remaining) : '-', valueClass: remainColor,
+      label: t('keyUsage.billingType'),
+      value: t('keyUsage.unlimited'), valueClass: '',
     })
   }
 

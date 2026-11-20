@@ -38,7 +38,7 @@ type usageBillingRequestKey struct {
 //   - 逐条命令的扣费后余额、是否透支、Key 额度是否在该条耗尽、账号额度状态，
 //     由合并语句返回的累加后值按命令顺序推算。
 //
-// 行锁按 user_subscriptions → users → api_keys → accounts 的顺序获取，表内按主键升序，
+// 行锁按 users → api_keys → accounts 的顺序获取，表内按主键升序，
 // 与 Apply 的加锁顺序一致。
 //
 // 命令校验失败（混合用户、重复请求键、缺 request_id、非有限金额）时直接返回 error。
@@ -77,9 +77,6 @@ func (r *usageBillingRepository) ApplyBatch(ctx context.Context, cmds []*service
 		}
 	}
 
-	if err := applyUsageBillingBatchSubscriptions(ctx, tx, cmds, applied); err != nil {
-		return nil, err
-	}
 	if err := applyUsageBillingBatchBalance(ctx, tx, userID, cmds, applied, outcomes); err != nil {
 		return nil, err
 	}
@@ -322,21 +319,6 @@ func groupUsageBillingAmounts(cmds []*service.UsageBillingCommand, applied []boo
 	}
 	sort.Slice(ids, func(a, b int) bool { return ids[a] < ids[b] })
 	return groups, ids
-}
-
-func applyUsageBillingBatchSubscriptions(ctx context.Context, tx *sql.Tx, cmds []*service.UsageBillingCommand, applied []bool) error {
-	groups, ids := groupUsageBillingAmounts(cmds, applied, func(cmd *service.UsageBillingCommand) (int64, float64, bool) {
-		if cmd.SubscriptionID == nil {
-			return 0, 0, false
-		}
-		return *cmd.SubscriptionID, cmd.SubscriptionCost, true
-	})
-	for _, id := range ids {
-		if err := incrementUsageBillingSubscription(ctx, tx, id, groups[id].sum.InexactFloat64()); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 func applyUsageBillingBatchBalance(ctx context.Context, tx *sql.Tx, userID int64, cmds []*service.UsageBillingCommand, applied []bool, outcomes []service.UsageBillingBatchOutcome) error {

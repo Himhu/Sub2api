@@ -392,30 +392,6 @@ func (s *DashboardService) GetAPIKeyUsageTrend(ctx context.Context, startTime, e
 	return trend, nil
 }
 
-func (s *DashboardService) GetUserUsageTrend(ctx context.Context, startTime, endTime time.Time, granularity string, limit int, metric string) ([]usagestats.UserUsageTrendPoint, error) {
-	trend, err := s.usageRepo.GetUserUsageTrend(ctx, startTime, endTime, granularity, limit, metric)
-	if err != nil {
-		return nil, fmt.Errorf("get user usage trend: %w", err)
-	}
-	return trend, nil
-}
-
-func (s *DashboardService) GetUserSpendingRanking(ctx context.Context, startTime, endTime time.Time, limit int) (*usagestats.UserSpendingRankingResponse, error) {
-	ranking, err := s.usageRepo.GetUserSpendingRanking(ctx, startTime, endTime, limit)
-	if err != nil {
-		return nil, fmt.Errorf("get user spending ranking: %w", err)
-	}
-	return ranking, nil
-}
-
-func (s *DashboardService) GetUserBreakdownStats(ctx context.Context, startTime, endTime time.Time, dim usagestats.UserBreakdownDimension, limit int) ([]usagestats.UserBreakdownItem, error) {
-	stats, err := s.usageRepo.GetUserBreakdownStats(ctx, startTime, endTime, dim, limit)
-	if err != nil {
-		return nil, fmt.Errorf("get user breakdown stats: %w", err)
-	}
-	return stats, nil
-}
-
 func (s *DashboardService) GetBatchUserUsageStats(ctx context.Context, userIDs []int64, startTime, endTime time.Time) (map[int64]*usagestats.BatchUserUsageStats, error) {
 	stats, err := s.usageRepo.GetBatchUserUsageStats(ctx, userIDs, startTime, endTime)
 	if err != nil {

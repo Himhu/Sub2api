@@ -54,9 +54,9 @@ func TestEstimateInflightReservationCost(t *testing.T) {
 func TestReserveInflightBalance_NoReservationCacheFailsOpen(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Billing.InflightReservation.Enabled = true
-	svc := NewBillingCacheService(nil, nil, nil, nil, nil, nil, cfg, nil)
+	svc := NewBillingCacheService(nil, nil, nil, nil, nil, cfg, nil)
 	t.Cleanup(svc.Stop)
-	release, err := svc.ReserveInflightBalance(context.Background(), &User{ID: 1}, nil, nil, 100)
+	release, err := svc.ReserveInflightBalance(context.Background(), &User{ID: 1}, nil, 100)
 	require.NoError(t, err)
 	release()
 }
@@ -64,7 +64,7 @@ func TestReserveInflightBalance_NoReservationCacheFailsOpen(t *testing.T) {
 func TestReserveInflightBalance_SimpleModeDisabled(t *testing.T) {
 	cfg := &config.Config{RunMode: config.RunModeSimple}
 	cfg.Billing.InflightReservation.Enabled = true
-	svc := NewBillingCacheService(nil, nil, nil, nil, nil, nil, cfg, nil)
+	svc := NewBillingCacheService(nil, nil, nil, nil, nil, cfg, nil)
 	t.Cleanup(svc.Stop)
 	require.False(t, svc.InflightReservationEnabled())
 }
@@ -265,67 +265,9 @@ func newInflightSvc(t *testing.T, cache BillingCache, ttlSeconds int) *BillingCa
 	t.Helper()
 	cfg := &config.Config{}
 	cfg.Billing.InflightReservation = config.InflightReservationConfig{Enabled: true, TTLSeconds: ttlSeconds}
-	svc := NewBillingCacheService(cache, nil, nil, nil, nil, nil, cfg, nil)
+	svc := NewBillingCacheService(cache, nil, nil, nil, nil, cfg, nil)
 	t.Cleanup(svc.Stop)
 	return svc
-}
-
-func TestInflightReservation_HeldUntilBillingTaskDone(t *testing.T) {
-	cache := newMemInflightCache(1)
-	svc := newInflightSvc(t, cache, 60)
-	user := &User{ID: 1}
-
-	res, err := svc.ReserveInflight(context.Background(), user, nil, nil, 0.9)
-	require.NoError(t, err)
-	require.NotNil(t, res)
-	taskDone := res.Acquire() // billing task submitted
-	res.HandlerDone()         // handler returned
-	require.Equal(t, 1, cache.count(), "reservation must survive handler return while billing is pending")
-
-	_, err = svc.ReserveInflight(context.Background(), user, nil, nil, 0.9)
-	require.ErrorIs(t, err, ErrInsufficientBalance)
-
-	taskDone()
-	taskDone() // idempotent
-	require.Equal(t, 0, cache.count())
-	require.Equal(t, int32(1), cache.releaseCt.Load(), "released exactly once")
-
-	// No billing task → HandlerDone releases immediately; Acquire after release is a no-op.
-	res2, err := svc.ReserveInflight(context.Background(), user, nil, nil, 0.1)
-	require.NoError(t, err)
-	res2.HandlerDone()
-	res2.HandlerDone()
-	require.Equal(t, 0, cache.count())
-	res2.Acquire()()
-	require.Equal(t, int32(2), cache.releaseCt.Load())
-
-	// Nil handle is safe.
-	var nilRes *InflightReservation
-	nilRes.Acquire()()
-	nilRes.HandlerDone()
-	nilRes.Release()
-}
-
-func TestInflightReservation_RenewedWhileHandlerActive(t *testing.T) {
-	cache := newMemInflightCache(1)
-	svc := newInflightSvc(t, cache, 1)
-	user := &User{ID: 2}
-
-	res, err := svc.ReserveInflight(context.Background(), user, nil, nil, 0.9)
-	require.NoError(t, err)
-	time.Sleep(2500 * time.Millisecond) // > 2 × TTL
-	require.Equal(t, 1, cache.count(), "renewal keeps the reservation alive past its TTL")
-	require.Greater(t, cache.renews.Load(), int32(3))
-	_, err = svc.ReserveInflight(context.Background(), user, nil, nil, 0.9)
-	require.ErrorIs(t, err, ErrInsufficientBalance)
-
-	done := res.Acquire()
-	res.HandlerDone()
-	renewsAtStop := cache.renews.Load()
-	time.Sleep(1200 * time.Millisecond)
-	require.Equal(t, renewsAtStop, cache.renews.Load(), "no renewal after handler end")
-	require.Equal(t, 0, cache.count(), "post-handler hold is bounded by TTL")
-	done()
 }
 
 func TestSyncBalanceCacheAfterDeduction_SynchronousWhenInflightEnabled(t *testing.T) {

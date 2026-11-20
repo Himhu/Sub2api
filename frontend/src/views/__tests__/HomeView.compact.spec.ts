@@ -115,10 +115,10 @@ describe('HomeView compact mode', () => {
     expect(compactDestination(mountHome({ compact_home_enabled: true }))).toBe('/login')
   })
 
-  it('links authenticated users to their dashboard', () => {
+  it('links authenticated non-admin sessions to the API keys page', () => {
     authStore.isAuthenticated = true
 
-    expect(compactDestination(mountHome({ compact_home_enabled: true }))).toBe('/dashboard')
+    expect(compactDestination(mountHome({ compact_home_enabled: true }))).toBe('/keys')
   })
 
   it('links administrators to the admin dashboard', () => {

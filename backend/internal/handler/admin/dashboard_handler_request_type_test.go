@@ -116,7 +116,6 @@ func newDashboardRequestTypeTestRouter(repo *dashboardUsageRepoCapture) *gin.Eng
 	router.GET("/admin/dashboard/trend", handler.GetUsageTrend)
 	router.GET("/admin/dashboard/models", handler.GetModelStats)
 	router.GET("/admin/dashboard/groups", handler.GetGroupStats)
-	router.GET("/admin/dashboard/users-ranking", handler.GetUserSpendingRanking)
 	return router
 }
 
@@ -294,33 +293,4 @@ func TestDashboardModelAuditFilterRejectsInvalidBoolean(t *testing.T) {
 		router.ServeHTTP(rec, req)
 		require.Equal(t, http.StatusBadRequest, rec.Code, path)
 	}
-}
-
-func TestDashboardUsersRankingLimitAndCache(t *testing.T) {
-	dashboardUsersRankingCache = newSnapshotCache(5 * time.Minute)
-	repo := &dashboardUsageRepoCapture{
-		ranking: []usagestats.UserSpendingRankingItem{
-			{UserID: 7, Email: "rank@example.com", ActualCost: 10.5, Requests: 3, Tokens: 300},
-		},
-		rankingTotal: 88.8,
-	}
-	router := newDashboardRequestTypeTestRouter(repo)
-
-	req := httptest.NewRequest(http.MethodGet, "/admin/dashboard/users-ranking?limit=100&start_date=2025-01-01&end_date=2025-01-02", nil)
-	rec := httptest.NewRecorder()
-	router.ServeHTTP(rec, req)
-
-	require.Equal(t, http.StatusOK, rec.Code)
-	require.Equal(t, 50, repo.rankingLimit)
-	require.Contains(t, rec.Body.String(), "\"total_actual_cost\":88.8")
-	require.Contains(t, rec.Body.String(), "\"total_requests\":44")
-	require.Contains(t, rec.Body.String(), "\"total_tokens\":1234")
-	require.Equal(t, "miss", rec.Header().Get("X-Snapshot-Cache"))
-
-	req2 := httptest.NewRequest(http.MethodGet, "/admin/dashboard/users-ranking?limit=100&start_date=2025-01-01&end_date=2025-01-02", nil)
-	rec2 := httptest.NewRecorder()
-	router.ServeHTTP(rec2, req2)
-
-	require.Equal(t, http.StatusOK, rec2.Code)
-	require.Equal(t, "hit", rec2.Header().Get("X-Snapshot-Cache"))
 }

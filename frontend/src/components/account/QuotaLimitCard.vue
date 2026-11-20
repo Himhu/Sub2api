@@ -2,7 +2,7 @@
 import { ref, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import QuotaDimensionRow from './QuotaDimensionRow.vue'
-import type { QuotaThresholdType, QuotaResetMode } from '@/constants/account'
+import type { QuotaResetMode } from '@/constants/account'
 
 const { t } = useI18n()
 
@@ -16,27 +16,7 @@ const props = withDefaults(defineProps<{
   weeklyResetDay: number | null
   weeklyResetHour: number | null
   resetTimezone: string | null
-  quotaNotifyGlobalEnabled?: boolean
-  quotaNotifyDailyEnabled?: boolean | null
-  quotaNotifyDailyThreshold?: number | null
-  quotaNotifyDailyThresholdType?: QuotaThresholdType | null
-  quotaNotifyWeeklyEnabled?: boolean | null
-  quotaNotifyWeeklyThreshold?: number | null
-  quotaNotifyWeeklyThresholdType?: QuotaThresholdType | null
-  quotaNotifyTotalEnabled?: boolean | null
-  quotaNotifyTotalThreshold?: number | null
-  quotaNotifyTotalThresholdType?: QuotaThresholdType | null
 }>(), {
-  quotaNotifyGlobalEnabled: false,
-  quotaNotifyDailyEnabled: null,
-  quotaNotifyDailyThreshold: null,
-  quotaNotifyDailyThresholdType: null,
-  quotaNotifyWeeklyEnabled: null,
-  quotaNotifyWeeklyThreshold: null,
-  quotaNotifyWeeklyThresholdType: null,
-  quotaNotifyTotalEnabled: null,
-  quotaNotifyTotalThreshold: null,
-  quotaNotifyTotalThresholdType: null,
 })
 
 const emit = defineEmits<{
@@ -49,15 +29,6 @@ const emit = defineEmits<{
   'update:weeklyResetDay': [value: number | null]
   'update:weeklyResetHour': [value: number | null]
   'update:resetTimezone': [value: string | null]
-  'update:quotaNotifyDailyEnabled': [value: boolean | null]
-  'update:quotaNotifyDailyThreshold': [value: number | null]
-  'update:quotaNotifyDailyThresholdType': [value: QuotaThresholdType | null]
-  'update:quotaNotifyWeeklyEnabled': [value: boolean | null]
-  'update:quotaNotifyWeeklyThreshold': [value: number | null]
-  'update:quotaNotifyWeeklyThresholdType': [value: QuotaThresholdType | null]
-  'update:quotaNotifyTotalEnabled': [value: boolean | null]
-  'update:quotaNotifyTotalThreshold': [value: number | null]
-  'update:quotaNotifyTotalThresholdType': [value: QuotaThresholdType | null]
 }>()
 
 const enabled = computed(() =>
@@ -169,10 +140,6 @@ const dailyFixedHint = computed(() =>
           dim="daily"
           :label="t('admin.accounts.quotaDailyLimit')"
           :limit="dailyLimit"
-          :quota-notify-global-enabled="quotaNotifyGlobalEnabled"
-          :notify-enabled="props.quotaNotifyDailyEnabled"
-          :notify-threshold="props.quotaNotifyDailyThreshold"
-          :notify-threshold-type="props.quotaNotifyDailyThresholdType"
           :reset-mode="dailyResetMode"
           :reset-hour="dailyResetHour"
           :reset-day="null"
@@ -183,9 +150,6 @@ const dailyFixedHint = computed(() =>
           :day-options="dayOptions"
           :timezone-options="timezoneOptions"
           @update:limit="emit('update:dailyLimit', $event)"
-          @update:notify-enabled="emit('update:quotaNotifyDailyEnabled', $event)"
-          @update:notify-threshold="emit('update:quotaNotifyDailyThreshold', $event)"
-          @update:notify-threshold-type="emit('update:quotaNotifyDailyThresholdType', $event)"
           @update:reset-mode="emit('update:dailyResetMode', $event)"
           @update:reset-hour="emit('update:dailyResetHour', $event)"
           @update:reset-timezone="emit('update:resetTimezone', $event)"
@@ -196,10 +160,6 @@ const dailyFixedHint = computed(() =>
           dim="weekly"
           :label="t('admin.accounts.quotaWeeklyLimit')"
           :limit="weeklyLimit"
-          :quota-notify-global-enabled="quotaNotifyGlobalEnabled"
-          :notify-enabled="props.quotaNotifyWeeklyEnabled"
-          :notify-threshold="props.quotaNotifyWeeklyThreshold"
-          :notify-threshold-type="props.quotaNotifyWeeklyThresholdType"
           :reset-mode="weeklyResetMode"
           :reset-hour="weeklyResetHour"
           :reset-day="weeklyResetDay"
@@ -210,9 +170,6 @@ const dailyFixedHint = computed(() =>
           :day-options="dayOptions"
           :timezone-options="timezoneOptions"
           @update:limit="emit('update:weeklyLimit', $event)"
-          @update:notify-enabled="emit('update:quotaNotifyWeeklyEnabled', $event)"
-          @update:notify-threshold="emit('update:quotaNotifyWeeklyThreshold', $event)"
-          @update:notify-threshold-type="emit('update:quotaNotifyWeeklyThresholdType', $event)"
           @update:reset-mode="emit('update:weeklyResetMode', $event)"
           @update:reset-hour="emit('update:weeklyResetHour', $event)"
           @update:reset-day="emit('update:weeklyResetDay', $event)"
@@ -224,10 +181,6 @@ const dailyFixedHint = computed(() =>
           dim="total"
           :label="t('admin.accounts.quotaTotalLimit')"
           :limit="totalLimit"
-          :quota-notify-global-enabled="quotaNotifyGlobalEnabled"
-          :notify-enabled="props.quotaNotifyTotalEnabled"
-          :notify-threshold="props.quotaNotifyTotalThreshold"
-          :notify-threshold-type="props.quotaNotifyTotalThresholdType"
           :reset-mode="null"
           :reset-hour="null"
           :reset-day="null"
@@ -237,9 +190,6 @@ const dailyFixedHint = computed(() =>
           :hour-options="hourOptions"
           :day-options="dayOptions"
           @update:limit="emit('update:totalLimit', $event)"
-          @update:notify-enabled="emit('update:quotaNotifyTotalEnabled', $event)"
-          @update:notify-threshold="emit('update:quotaNotifyTotalThreshold', $event)"
-          @update:notify-threshold-type="emit('update:quotaNotifyTotalThresholdType', $event)"
         />
       </div>
   </div>

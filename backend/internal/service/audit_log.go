@@ -143,11 +143,6 @@ var auditBodySensitiveExactKeys = func() map[string]struct{} {
 	for _, k := range SensitiveCredentialKeys {
 		set[auditNormalizeBodyKey(k)] = struct{}{}
 	}
-	for _, fields := range providerSensitiveConfigFields {
-		for k := range fields {
-			set[auditNormalizeBodyKey(k)] = struct{}{}
-		}
-	}
 	return set
 }()
 

@@ -4,7 +4,7 @@ import 'driver.js/dist/driver.css'
 import { useAuthStore as useUserStore } from '@/stores/auth'
 import { useOnboardingStore } from '@/stores/onboarding'
 import { useI18n } from 'vue-i18n'
-import { getAdminSteps, getUserSteps } from '@/components/Guide/steps'
+import { getAdminSteps } from '@/components/Guide/steps'
 
 export interface OnboardingOptions {
   storageKey?: string
@@ -92,10 +92,9 @@ export function useOnboardingTour(options: OnboardingOptions) {
   }
 
   const startTour = async (startIndex = 0) => {
-    // 动态获取当前用户角色和步骤
-    const isAdmin = userStore.user?.role === 'admin'
+    // 单管理员部署：只有管理员引导流程
     const isSimpleMode = userStore.isSimpleMode
-    const steps = isAdmin ? getAdminSteps(t, isSimpleMode) : getUserSteps(t)
+    const steps = getAdminSteps(t, isSimpleMode)
 
     // 确保 DOM 就绪
     await nextTick()

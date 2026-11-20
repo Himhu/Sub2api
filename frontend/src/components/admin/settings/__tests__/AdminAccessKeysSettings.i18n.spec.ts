@@ -32,7 +32,7 @@ function setup(locale: 'en' | 'zh' = 'en') {
 
 describe('管理员密钥英文体验', () => {
   it('各自后端目录的每个权限都有准确的中英文标签与分类', () => {
-    expect(catalog.length).toBeGreaterThan(50)
+    expect(catalog.length).toBeGreaterThan(30)
     expect(new Set(catalog.map(permission => permission.id)).size).toBe(catalog.length)
     const expectedKeys = catalog.map(permission => permission.id.replaceAll('_', '_u').replaceAll('.', '_d')).sort()
     for (const messages of [enKeys, zhKeys]) {
@@ -102,7 +102,7 @@ describe('管理员密钥英文体验', () => {
     expect(wrapper.text()).toContain('Admin access keys')
     expect(wrapper.text()).not.toMatch(/[\u3400-\u9fff]/u)
     expect(wrapper.text()).toContain('Read accounts (redacted)')
-    expect(wrapper.text()).toContain('Finance')
+    expect(wrapper.text()).toContain('Reports')
     expect(wrapper.text()).toContain('future.feature')
     const unknown = wrapper.get('input[value="payment.mark.paid"]').element.closest('label')!
     expect(unknown.textContent).toContain('Unknown permission (payment.mark.paid)')

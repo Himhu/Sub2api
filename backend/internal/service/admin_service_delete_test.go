@@ -219,10 +219,6 @@ func (s *userRepoStub) AddGroupToAllowedGroups(ctx context.Context, userID int64
 	panic("unexpected AddGroupToAllowedGroups call")
 }
 
-func (s *userRepoStub) ListUserAuthIdentities(ctx context.Context, userID int64) ([]UserAuthIdentityRecord, error) {
-	panic("unexpected ListUserAuthIdentities call")
-}
-
 func (s *userRepoStub) UnbindUserAuthProvider(context.Context, int64, string) error {
 	panic("unexpected UnbindUserAuthProvider call")
 }
@@ -410,84 +406,6 @@ func (s *proxyRepoStub) CountExpiringSoon(_ context.Context, _ time.Time) (int64
 	return 0, nil
 }
 
-type redeemRepoStub struct {
-	deleteErrByID map[int64]error
-	deletedIDs    []int64
-
-	batchUpdateIDs    []int64
-	batchUpdateFields RedeemCodeBatchUpdateFields
-	batchUpdateResult int64
-	batchUpdateErr    error
-	batchUpdateCalled bool
-}
-
-func (s *redeemRepoStub) Create(ctx context.Context, code *RedeemCode) error {
-	panic("unexpected Create call")
-}
-
-func (s *redeemRepoStub) CreateBatch(ctx context.Context, codes []RedeemCode) error {
-	panic("unexpected CreateBatch call")
-}
-
-func (s *redeemRepoStub) GetByID(ctx context.Context, id int64) (*RedeemCode, error) {
-	panic("unexpected GetByID call")
-}
-
-func (s *redeemRepoStub) GetByCode(ctx context.Context, code string) (*RedeemCode, error) {
-	panic("unexpected GetByCode call")
-}
-
-func (s *redeemRepoStub) Update(ctx context.Context, code *RedeemCode) error {
-	panic("unexpected Update call")
-}
-
-func (s *redeemRepoStub) BatchUpdate(ctx context.Context, ids []int64, fields RedeemCodeBatchUpdateFields) (int64, error) {
-	s.batchUpdateCalled = true
-	s.batchUpdateIDs = append([]int64(nil), ids...)
-	s.batchUpdateFields = fields
-	if s.batchUpdateErr != nil {
-		return 0, s.batchUpdateErr
-	}
-	if s.batchUpdateResult != 0 {
-		return s.batchUpdateResult, nil
-	}
-	return int64(len(ids)), nil
-}
-
-func (s *redeemRepoStub) Delete(ctx context.Context, id int64) error {
-	s.deletedIDs = append(s.deletedIDs, id)
-	if s.deleteErrByID != nil {
-		if err, ok := s.deleteErrByID[id]; ok {
-			return err
-		}
-	}
-	return nil
-}
-
-func (s *redeemRepoStub) Use(ctx context.Context, id, userID int64) error {
-	panic("unexpected Use call")
-}
-
-func (s *redeemRepoStub) List(ctx context.Context, params pagination.PaginationParams) ([]RedeemCode, *pagination.PaginationResult, error) {
-	panic("unexpected List call")
-}
-
-func (s *redeemRepoStub) ListWithFilters(ctx context.Context, params pagination.PaginationParams, codeType, status, search string) ([]RedeemCode, *pagination.PaginationResult, error) {
-	panic("unexpected ListWithFilters call")
-}
-
-func (s *redeemRepoStub) ListByUser(ctx context.Context, userID int64, limit int) ([]RedeemCode, error) {
-	panic("unexpected ListByUser call")
-}
-
-func (s *redeemRepoStub) ListByUserPaginated(ctx context.Context, userID int64, params pagination.PaginationParams, codeType string) ([]RedeemCode, *pagination.PaginationResult, error) {
-	panic("unexpected ListByUserPaginated call")
-}
-
-func (s *redeemRepoStub) SumPositiveBalanceByUser(ctx context.Context, userID int64) (float64, error) {
-	panic("unexpected SumPositiveBalanceByUser call")
-}
-
 type subscriptionInvalidateCall struct {
 	userID  int64
 	groupID int64
@@ -575,88 +493,7 @@ func (s *billingCacheStub) BatchGetUserPlatformQuotaCache(ctx context.Context, k
 	panic("unexpected BatchGetUserPlatformQuotaCache call")
 }
 
-func waitForInvalidations(t *testing.T, ch <-chan subscriptionInvalidateCall, expected int) []subscriptionInvalidateCall {
-	t.Helper()
-	calls := make([]subscriptionInvalidateCall, 0, expected)
-	timeout := time.After(2 * time.Second)
-	for len(calls) < expected {
-		select {
-		case call := <-ch:
-			calls = append(calls, call)
-		case <-timeout:
-			t.Fatalf("timeout waiting for %d invalidations, got %d", expected, len(calls))
-		}
-	}
-	return calls
-}
-
-func TestAdminService_DeleteUser_Success(t *testing.T) {
-	repo := &userRepoStub{user: &User{ID: 7, Role: RoleUser}}
-	svc := &adminServiceImpl{userRepo: repo}
-
-	err := svc.DeleteUser(context.Background(), 7)
-	require.NoError(t, err)
-	require.Equal(t, []int64{7}, repo.deletedIDs)
-}
-
-func TestAdminService_DeleteUser_DeletesOwnedAPIKeys(t *testing.T) {
-	repo := &userRepoStub{user: &User{ID: 7, Role: RoleUser}}
-	apiKeyRepo := &apiKeyRepoStub{
-		allowListByUserID: true,
-		listByUserIDKeys: []APIKey{
-			{ID: 11, UserID: 7, Key: "sk-user-1"},
-			{ID: 12, UserID: 7, Key: "sk-user-2"},
-		},
-	}
-	invalidator := &authCacheInvalidatorStub{}
-	svc := &adminServiceImpl{
-		userRepo:             repo,
-		apiKeyRepo:           apiKeyRepo,
-		authCacheInvalidator: invalidator,
-	}
-
-	err := svc.DeleteUser(context.Background(), 7)
-	require.NoError(t, err)
-	require.Equal(t, []int64{7}, repo.deletedIDs)
-	require.Equal(t, []int64{7}, apiKeyRepo.listByUserIDCalls)
-	require.Equal(t, []int64{11, 12}, apiKeyRepo.deletedIDs)
-	require.ElementsMatch(t, []string{"sk-user-1", "sk-user-2"}, invalidator.keys)
-	require.Equal(t, []int64{7}, invalidator.userIDs)
-}
-
-func TestAdminService_DeleteUser_NotFound(t *testing.T) {
-	repo := &userRepoStub{getErr: ErrUserNotFound}
-	svc := &adminServiceImpl{userRepo: repo}
-
-	err := svc.DeleteUser(context.Background(), 404)
-	require.ErrorIs(t, err, ErrUserNotFound)
-	require.Empty(t, repo.deletedIDs)
-}
-
-func TestAdminService_DeleteUser_AdminGuard(t *testing.T) {
-	repo := &userRepoStub{user: &User{ID: 1, Role: RoleAdmin}}
-	svc := &adminServiceImpl{userRepo: repo}
-
-	err := svc.DeleteUser(context.Background(), 1)
-	require.Error(t, err)
-	require.ErrorContains(t, err, "cannot delete admin user")
-	require.Empty(t, repo.deletedIDs)
-}
-
-func TestAdminService_DeleteUser_DeleteError(t *testing.T) {
-	deleteErr := errors.New("delete failed")
-	repo := &userRepoStub{
-		user:      &User{ID: 9, Role: RoleUser},
-		deleteErr: deleteErr,
-	}
-	svc := &adminServiceImpl{userRepo: repo}
-
-	err := svc.DeleteUser(context.Background(), 9)
-	require.ErrorIs(t, err, deleteErr)
-	require.Equal(t, []int64{9}, repo.deletedIDs)
-}
-
-func TestAdminService_DeleteGroup_Success_WithCacheInvalidation(t *testing.T) {
+func TestAdminService_DeleteGroup_Success(t *testing.T) {
 	cache := newBillingCacheStub(2)
 	repo := &groupRepoStub{affectedUserIDs: []int64{11, 12}}
 	svc := &adminServiceImpl{
@@ -668,11 +505,12 @@ func TestAdminService_DeleteGroup_Success_WithCacheInvalidation(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []int64{5}, repo.deleteCalls)
 
-	calls := waitForInvalidations(t, cache.invalidations, 2)
-	require.ElementsMatch(t, []subscriptionInvalidateCall{
-		{userID: 11, groupID: 5},
-		{userID: 12, groupID: 5},
-	}, calls)
+	// 订阅功能已裁剪：删除分组不再失效订阅缓存。
+	select {
+	case call := <-cache.invalidations:
+		t.Fatalf("unexpected subscription cache invalidation: %+v", call)
+	case <-time.After(50 * time.Millisecond):
+	}
 }
 
 func TestAdminService_DeleteGroup_InvalidatesAuthCacheForBoundKeys(t *testing.T) {
@@ -759,56 +597,4 @@ func TestAdminService_DeleteProxy_Error(t *testing.T) {
 
 	err := svc.DeleteProxy(context.Background(), 33)
 	require.ErrorIs(t, err, deleteErr)
-}
-
-func TestAdminService_DeleteRedeemCode_Success(t *testing.T) {
-	repo := &redeemRepoStub{}
-	svc := &adminServiceImpl{redeemCodeRepo: repo}
-
-	err := svc.DeleteRedeemCode(context.Background(), 10)
-	require.NoError(t, err)
-	require.Equal(t, []int64{10}, repo.deletedIDs)
-}
-
-func TestAdminService_DeleteRedeemCode_Idempotent(t *testing.T) {
-	repo := &redeemRepoStub{}
-	svc := &adminServiceImpl{redeemCodeRepo: repo}
-
-	err := svc.DeleteRedeemCode(context.Background(), 999)
-	require.NoError(t, err)
-	require.Equal(t, []int64{999}, repo.deletedIDs)
-}
-
-func TestAdminService_DeleteRedeemCode_Error(t *testing.T) {
-	deleteErr := errors.New("delete failed")
-	repo := &redeemRepoStub{deleteErrByID: map[int64]error{1: deleteErr}}
-	svc := &adminServiceImpl{redeemCodeRepo: repo}
-
-	err := svc.DeleteRedeemCode(context.Background(), 1)
-	require.ErrorIs(t, err, deleteErr)
-	require.Equal(t, []int64{1}, repo.deletedIDs)
-}
-
-func TestAdminService_BatchDeleteRedeemCodes_Success(t *testing.T) {
-	repo := &redeemRepoStub{}
-	svc := &adminServiceImpl{redeemCodeRepo: repo}
-
-	deleted, err := svc.BatchDeleteRedeemCodes(context.Background(), []int64{1, 2, 3})
-	require.NoError(t, err)
-	require.Equal(t, int64(3), deleted)
-	require.Equal(t, []int64{1, 2, 3}, repo.deletedIDs)
-}
-
-func TestAdminService_BatchDeleteRedeemCodes_PartialFailures(t *testing.T) {
-	repo := &redeemRepoStub{
-		deleteErrByID: map[int64]error{
-			2: errors.New("db error"),
-		},
-	}
-	svc := &adminServiceImpl{redeemCodeRepo: repo}
-
-	deleted, err := svc.BatchDeleteRedeemCodes(context.Background(), []int64{1, 2, 3})
-	require.NoError(t, err)
-	require.Equal(t, int64(2), deleted)
-	require.Equal(t, []int64{1, 2, 3}, repo.deletedIDs)
 }

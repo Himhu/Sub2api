@@ -98,7 +98,7 @@ func (b *billingCacheWorkerStub) BatchGetUserPlatformQuotaCache(ctx context.Cont
 
 func TestBillingCacheServiceQueueHighLoad(t *testing.T) {
 	cache := &billingCacheWorkerStub{}
-	svc := NewBillingCacheService(cache, nil, nil, nil, nil, nil, &config.Config{}, nil)
+	svc := NewBillingCacheService(cache, nil, nil, nil, nil, &config.Config{}, nil)
 	t.Cleanup(svc.Stop)
 
 	start := time.Now()
@@ -107,20 +107,14 @@ func TestBillingCacheServiceQueueHighLoad(t *testing.T) {
 	}
 	require.Less(t, time.Since(start), 2*time.Second)
 
-	svc.QueueUpdateSubscriptionUsage(1, 2, 1.5)
-
 	require.Eventually(t, func() bool {
 		return atomic.LoadInt64(&cache.balanceUpdates) > 0
-	}, 2*time.Second, 10*time.Millisecond)
-
-	require.Eventually(t, func() bool {
-		return atomic.LoadInt64(&cache.subscriptionUpdates) > 0
 	}, 2*time.Second, 10*time.Millisecond)
 }
 
 func TestBillingCacheServiceEnqueueAfterStopReturnsFalse(t *testing.T) {
 	cache := &billingCacheWorkerStub{}
-	svc := NewBillingCacheService(cache, nil, nil, nil, nil, nil, &config.Config{}, nil)
+	svc := NewBillingCacheService(cache, nil, nil, nil, nil, &config.Config{}, nil)
 	svc.Stop()
 
 	enqueued := svc.enqueueCacheWrite(cacheWriteTask{

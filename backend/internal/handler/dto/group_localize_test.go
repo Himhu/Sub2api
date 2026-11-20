@@ -39,9 +39,7 @@ func TestGroupLocalized_KeepsOriginalWhenLanguageHasNoTranslation(t *testing.T) 
 func TestLocalized_NilSafe(t *testing.T) {
 	require.Nil(t, (*Group)(nil).Localized("en"))
 	require.Nil(t, (*APIKey)(nil).Localized("en"))
-	require.Nil(t, (*RedeemCode)(nil).Localized("en"))
 	require.Nil(t, (*UsageLog)(nil).Localized("en"))
-	require.Nil(t, (*UserSubscription)(nil).Localized("en"))
 
 	// 未携带分组的记录原样返回
 	require.Nil(t, (&APIKey{}).Localized("en").Group)
@@ -51,21 +49,12 @@ func TestLocalized_NestedGroups(t *testing.T) {
 	key := (&APIKey{Group: localizableGroup()}).Localized("en")
 	require.Equal(t, "Standard", key.Group.Name)
 
-	code := (&RedeemCode{Group: localizableGroup()}).Localized("en")
-	require.Equal(t, "Standard", code.Group.Name)
-
-	sub := (&UserSubscription{Group: localizableGroup()}).Localized("en")
-	require.Equal(t, "Standard", sub.Group.Name)
-
-	// 使用记录除自身分组外，还带着 API Key 与订阅各自的分组
+	// 使用记录除自身分组外，还带着 API Key 的分组
 	log := (&UsageLog{
-		Group:        localizableGroup(),
-		APIKey:       &APIKey{Group: localizableGroup()},
-		Subscription: &UserSubscription{Group: localizableGroup()},
+		Group:  localizableGroup(),
+		APIKey: &APIKey{Group: localizableGroup()},
 	}).Localized("en")
 	require.Equal(t, "Standard", log.Group.Name)
 	require.Equal(t, "Standard", log.APIKey.Group.Name)
-	require.Equal(t, "Standard", log.Subscription.Group.Name)
 	require.Nil(t, log.APIKey.Group.I18n)
-	require.Nil(t, log.Subscription.Group.I18n)
 }

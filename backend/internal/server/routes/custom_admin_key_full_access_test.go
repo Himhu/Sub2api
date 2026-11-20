@@ -79,7 +79,7 @@ func TestAdminFullAccessCreationRequiresHTTPConfirmation(t *testing.T) {
 			c.Set(string(middleware.ContextKeyUser), middleware.AuthSubject{UserID: 9})
 			c.Next()
 		})
-		RegisterAdminRoutes(r.Group("/api/v1"), &handler.Handlers{Admin: &handler.AdminHandlers{Setting: adminhandler.NewSettingHandler(settings, nil, nil, nil, nil, nil, nil)}}, auth, middleware.AuditLogMiddleware(func(c *gin.Context) { c.Next() }), middleware.StepUpAuthMiddleware(func(c *gin.Context) { c.Next() }), nil, nil)
+		RegisterAdminRoutes(r.Group("/api/v1"), &handler.Handlers{Admin: &handler.AdminHandlers{Setting: adminhandler.NewSettingHandler(settings, nil, nil)}}, auth, middleware.AuditLogMiddleware(func(c *gin.Context) { c.Next() }), middleware.StepUpAuthMiddleware(func(c *gin.Context) { c.Next() }), nil, nil)
 		req := httptest.NewRequest("POST", "/api/v1/admin/settings/admin-api-keys", strings.NewReader(tc.body))
 		req.Header.Set("Content-Type", "application/json")
 		w := httptest.NewRecorder()

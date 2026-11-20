@@ -28,7 +28,7 @@ func (r *moderationEngineSettings) Set(_ context.Context, _ string, value string
 func TestContentModerationEngineHandlerRoundTrip(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	settings := &moderationEngineSettings{value: `{"api_keys":["legacy-secret"],"model":"omni-moderation-latest"}`}
-	svc := service.NewContentModerationService(settings, nil, nil, nil, nil, nil, nil, nil)
+	svc := service.NewContentModerationService(settings, nil, nil, nil, nil, nil, nil)
 	h := NewContentModerationHandler(svc)
 	router := gin.New()
 	router.PUT("/config", h.UpdateConfig)

@@ -19,13 +19,12 @@ import (
 )
 
 // batchBillingFixture 是一个用户及其计费相关的行：两个 Key（A 有额度）、两个支持额度的账号
-// （P 设总额度与日额度，Q 只设周额度）和一个订阅。
+// （P 设总额度与日额度，Q 只设周额度）。
 type batchBillingFixture struct {
-	userID         int64
-	keyA, keyB     int64
-	accountP       int64
-	accountQ       int64
-	subscriptionID int64
+	userID     int64
+	keyA, keyB int64
+	accountP   int64
+	accountQ   int64
 }
 
 func newBatchBillingFixture(t *testing.T, client *dbent.Client, balance float64) batchBillingFixture {
@@ -35,11 +34,6 @@ func newBatchBillingFixture(t *testing.T, client *dbent.Client, balance float64)
 		Email:        fmt.Sprintf("usage-billing-batch-%s@example.com", suffix),
 		PasswordHash: "hash",
 		Balance:      balance,
-	})
-	group := mustCreateGroup(t, client, &service.Group{
-		Name:             "usage-billing-batch-group-" + suffix,
-		Platform:         service.PlatformAnthropic,
-		SubscriptionType: service.SubscriptionTypeSubscription,
 	})
 	keyA := mustCreateApiKey(t, client, &service.APIKey{
 		UserID: user.ID, Key: "sk-usage-billing-batch-a-" + suffix, Name: "batch-a", Quota: 5,
@@ -57,10 +51,9 @@ func newBatchBillingFixture(t *testing.T, client *dbent.Client, balance float64)
 		Type:  service.AccountTypeAPIKey,
 		Extra: map[string]any{"quota_weekly_limit": 3.0},
 	})
-	subscription := mustCreateSubscription(t, client, &service.UserSubscription{UserID: user.ID, GroupID: group.ID})
 	return batchBillingFixture{
 		userID: user.ID, keyA: keyA.ID, keyB: keyB.ID,
-		accountP: accountP.ID, accountQ: accountQ.ID, subscriptionID: subscription.ID,
+		accountP: accountP.ID, accountQ: accountQ.ID,
 	}
 }
 
@@ -69,7 +62,6 @@ type batchBillingStep struct {
 	key          byte
 	account      byte
 	balance      float64
-	subscription float64
 	keyQuota     float64
 	keyRate      float64
 	accountQuota float64
@@ -95,11 +87,6 @@ func (f batchBillingFixture) commands(prefix string, steps []batchBillingStep) [
 		if s.account == 'Q' {
 			cmd.AccountID = f.accountQ
 		}
-		if s.subscription > 0 {
-			subscriptionID := f.subscriptionID
-			cmd.SubscriptionID = &subscriptionID
-			cmd.SubscriptionCost = s.subscription
-		}
 		cmds[i] = cmd
 	}
 	return cmds
@@ -112,7 +99,6 @@ type batchBillingState struct {
 	keyBUsage5h, keyBUsage7d       string
 	pUsed, pDailyUsed, pWeeklyUsed string
 	qUsed, qDailyUsed, qWeeklyUsed string
-	subDaily, subWeekly, subMonth  string
 	dedupRows                      int
 	pOutbox, qOutbox               int
 }
@@ -137,9 +123,6 @@ func readBatchBillingState(t *testing.T, ctx context.Context, f batchBillingFixt
 	}
 	s.pUsed, s.pDailyUsed, s.pWeeklyUsed = accountUsed(f.accountP, "quota_used"), accountUsed(f.accountP, "quota_daily_used"), accountUsed(f.accountP, "quota_weekly_used")
 	s.qUsed, s.qDailyUsed, s.qWeeklyUsed = accountUsed(f.accountQ, "quota_used"), accountUsed(f.accountQ, "quota_daily_used"), accountUsed(f.accountQ, "quota_weekly_used")
-	q(&s.subDaily, "SELECT daily_usage_usd::text FROM user_subscriptions WHERE id = $1", f.subscriptionID)
-	q(&s.subWeekly, "SELECT weekly_usage_usd::text FROM user_subscriptions WHERE id = $1", f.subscriptionID)
-	q(&s.subMonth, "SELECT monthly_usage_usd::text FROM user_subscriptions WHERE id = $1", f.subscriptionID)
 	q(&s.dedupRows, "SELECT COUNT(*) FROM usage_billing_dedup WHERE api_key_id IN ($1, $2)", f.keyA, f.keyB)
 	q(&s.pOutbox, "SELECT COUNT(*) FROM scheduler_outbox WHERE event_type = $1 AND account_id = $2", service.SchedulerOutboxEventAccountChanged, f.accountP)
 	q(&s.qOutbox, "SELECT COUNT(*) FROM scheduler_outbox WHERE event_type = $1 AND account_id = $2", service.SchedulerOutboxEventAccountChanged, f.accountQ)
@@ -152,12 +135,12 @@ func TestUsageBillingRepositoryApplyBatch_MatchesSequentialApply(t *testing.T) {
 	repo := NewUsageBillingRepository(client, integrationDB)
 
 	// 余额 10：第 6 条起透支；Key A 额度 5 在第 5 条耗尽；账号 P 日额度 4 在第 5 条、总额度 6 在第 6 条越线；
-	// 账号 Q 周额度 3 在第 3 条恰好达到；第 4 条走订阅。
+	// 账号 Q 周额度 3 在第 3 条恰好达到；第 4 条只计 Key 配额。
 	steps := []batchBillingStep{
 		{key: 'A', account: 'P', balance: 1.5, keyQuota: 1.5, keyRate: 1.5, accountQuota: 1.5},
 		{key: 'A', account: 'P', balance: 2.25, keyQuota: 2.25, keyRate: 2.25, accountQuota: 2.25},
 		{key: 'B', account: 'Q', balance: 3, keyRate: 3, accountQuota: 3},
-		{key: 'A', account: 'P', subscription: 1, keyQuota: 1},
+		{key: 'A', account: 'P', keyQuota: 1},
 		{key: 'A', account: 'P', balance: 4, keyQuota: 0.5, accountQuota: 0.5},
 		{key: 'B', account: 'P', balance: 0.75, keyRate: 0.12345678, accountQuota: 2},
 		{key: 'A', account: 'Q', balance: 0.1, keyQuota: 0.3, accountQuota: 0.00000001},
@@ -283,21 +266,6 @@ func TestUsageBillingRepositoryApplyBatch_RollsBackWholeBatchOnError(t *testing.
 		state := readBatchBillingState(t, ctx, f)
 		require.Zero(t, state.dedupRows)
 		require.Equal(t, "0", state.pUsed)
-	})
-
-	t.Run("missing subscription", func(t *testing.T) {
-		f := newBatchBillingFixture(t, client, 10)
-		_, err := integrationDB.ExecContext(ctx, "UPDATE user_subscriptions SET deleted_at = NOW() WHERE id = $1", f.subscriptionID)
-		require.NoError(t, err)
-
-		_, err = repo.ApplyBatch(ctx, f.commands("missing-sub-"+uuid.NewString(), []batchBillingStep{
-			{key: 'B', balance: 1},
-			{key: 'A', subscription: 1},
-		}))
-		require.ErrorIs(t, err, service.ErrSubscriptionNotFound)
-		state := readBatchBillingState(t, ctx, f)
-		require.Zero(t, state.dedupRows)
-		require.Equal(t, "10.00000000", state.balance)
 	})
 
 	t.Run("invalid batches", func(t *testing.T) {

@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { defineComponent } from 'vue'
 
-import UserUsageView from '@/views/user/UsageView.vue'
 import AdminUsageView from '@/views/admin/UsageView.vue'
 
 const {
@@ -16,7 +15,6 @@ const {
   adminGetStats,
   adminGetSnapshotV2,
   adminGetModelStats,
-  adminGetById,
   listErrorLogs,
 } = vi.hoisted(() => ({
   userQuery: vi.fn(),
@@ -29,7 +27,6 @@ const {
   adminGetStats: vi.fn(),
   adminGetSnapshotV2: vi.fn(),
   adminGetModelStats: vi.fn(),
-  adminGetById: vi.fn(),
   listErrorLogs: vi.fn(),
 }))
 
@@ -40,7 +37,6 @@ const messages: Record<string, string> = {
   'admin.dashboard.hour': 'Hour',
   'admin.users.columnSettings': 'Columns',
   'admin.usage.group': 'Group',
-  'admin.usage.user': 'User',
   'admin.usage.account': 'Account',
   'admin.usage.billingType': 'Billing type',
   'admin.usage.billingMode': 'Billing mode',
@@ -102,9 +98,6 @@ vi.mock('@/api/admin', () => ({
     dashboard: {
       getSnapshotV2: adminGetSnapshotV2,
       getModelStats: adminGetModelStats,
-    },
-    users: {
-      getById: adminGetById,
     },
   },
 }))
@@ -192,8 +185,6 @@ const userMappedLog = {
 const adminMappedLog = {
   ...userMappedLog,
   request_id: 'req-admin-mapped',
-  user_id: 7,
-  user: { email: 'liu.jialin@code-dance.com' },
   account: { name: 'codex-wang' },
   upstream_reasoning_effort: 'xhigh',
 }
@@ -238,25 +229,11 @@ describe('usage reasoning effort page display', () => {
     adminGetStats.mockReset().mockResolvedValue(emptyStats)
     adminGetSnapshotV2.mockReset().mockResolvedValue({ trend: [], models: [], groups: [] })
     adminGetModelStats.mockReset().mockResolvedValue({ models: [] })
-    adminGetById.mockReset().mockResolvedValue({ id: 7, email: 'liu.jialin@code-dance.com' })
     listErrorLogs.mockReset().mockResolvedValue({ items: [], total: 0 })
   })
 
   afterEach(() => {
     localStorage.clear()
-  })
-
-  it('user usage page only shows the requested reasoning effort', async () => {
-    const wrapper = mount(UserUsageView, {
-      global: { stubs: sharedPageStubs },
-    })
-    await flushPromises()
-
-    const cell = reasoningCellText(wrapper)
-    expect(cell).toContain('Max')
-    expect(cell).not.toContain('XHigh')
-    expect(cell).not.toContain('↳')
-    expect(wrapper.text()).not.toContain('XHigh')
   })
 
   it('admin usage page shows requested and mapped effort after the column is enabled', async () => {
@@ -267,8 +244,6 @@ describe('usage reasoning effort page display', () => {
           UsageFilters: adminFiltersStub,
           UsageExportProgress: true,
           UsageCleanupDialog: true,
-          UserBalanceHistoryModal: true,
-          UserTokenRanking: true,
           OpsErrorLogTable: true,
           OpsErrorDetailModal: true,
         },
@@ -302,8 +277,6 @@ describe('usage reasoning effort page display', () => {
           UsageFilters: adminFiltersStub,
           UsageExportProgress: true,
           UsageCleanupDialog: true,
-          UserBalanceHistoryModal: true,
-          UserTokenRanking: true,
           OpsErrorLogTable: true,
           OpsErrorDetailModal: true,
         },

@@ -5,9 +5,6 @@ import UsageFilters from '../UsageFilters.vue'
 
 // --- i18n messages (only what UsageFilters needs) ---
 const messages: Record<string, string> = {
-  'admin.usage.userDeletedBadge': 'deleted',
-  'admin.usage.userFilter': 'User',
-  'admin.usage.searchUserPlaceholder': 'Search user...',
   'usage.apiKeyFilter': 'API Key',
   'admin.usage.searchApiKeyPlaceholder': 'Search API key...',
   'usage.model': 'Model',
@@ -54,8 +51,7 @@ vi.mock('vue-i18n', async () => {
   }
 })
 
-// Mock the admin API module — we control searchUsers return value per test
-const mockSearchUsers = vi.fn()
+// Mock the admin API module — we control searchApiKeys return value per test
 const mockSearchApiKeys = vi.fn().mockResolvedValue([])
 const mockGroupsList = vi.fn().mockResolvedValue({ items: [] })
 const mockGetModelStats = vi.fn().mockResolvedValue({ models: [] })
@@ -64,7 +60,6 @@ const mockAccountsList = vi.fn().mockResolvedValue({ items: [] })
 vi.mock('@/api/admin', () => ({
   adminAPI: {
     usage: {
-      searchUsers: (...args: any[]) => mockSearchUsers(...args),
       searchApiKeys: (...args: any[]) => mockSearchApiKeys(...args),
     },
     groups: { list: (...args: any[]) => mockGroupsList(...args) },
@@ -75,8 +70,7 @@ vi.mock('@/api/admin', () => ({
 
 // Default props helper
 const defaultFilters = () => ({
-  user_id: undefined,
-  api_key_id: undefined,
+  api_key_id: undefined as number | undefined,
   account_id: undefined,
   model: null,
   request_type: null,
@@ -108,130 +102,51 @@ function mountFilters(filters = defaultFilters()) {
   })
 }
 
-function deferred<T>() {
-  let resolve!: (value: T | PromiseLike<T>) => void
-  let reject!: (reason?: unknown) => void
-  const promise = new Promise<T>((promiseResolve, promiseReject) => {
-    resolve = promiseResolve
-    reject = promiseReject
-  })
-
-  return { promise, resolve, reject }
-}
-
-describe('UsageFilters — user search dropdown', () => {
+describe('UsageFilters — API key search dropdown', () => {
   beforeEach(() => {
     vi.useFakeTimers()
-    mockSearchUsers.mockReset()
-    mockSearchApiKeys.mockResolvedValue([])
+    mockSearchApiKeys.mockReset().mockResolvedValue([])
   })
 
   afterEach(() => {
     vi.useRealTimers()
   })
 
-  it('(a) labels deleted users with the i18n badge and (b) sorts active users before deleted ones, (c) selection sets user_id', async () => {
-    // Arrange: mock returns deleted FIRST (proves sorting re-orders to active-first)
-    mockSearchUsers.mockResolvedValue([
-      { id: 2, email: 'gone@test.com', deleted: true },
-      { id: 1, email: 'active@test.com', deleted: false },
+  it('has no user search filter', () => {
+    const wrapper = mountFilters()
+    expect(wrapper.find('[aria-label="Clear user filter"]').exists()).toBe(false)
+    // API key + account search inputs only
+    expect(wrapper.findAll('.usage-filter-dropdown')).toHaveLength(2)
+  })
+
+  it('loads keys on focus without a user, searches by keyword only, and selection sets api_key_id', async () => {
+    mockSearchApiKeys.mockResolvedValue([
+      { id: 11, name: 'key-a', user_id: 1 },
+      { id: 12, name: 'key-b', user_id: 1 },
     ])
 
     const wrapper = mountFilters()
-
-    // Trigger focus (sets showUserDropdown = true) then input (fires debounceUserSearch)
     const input = wrapper.find('input[type="text"]')
-    await input.trigger('focus')
-    await input.setValue('test')
-    await input.trigger('input')
 
-    // Advance debounce timer (300ms) then flush the resolved promise
+    await input.trigger('focus')
     vi.advanceTimersByTime(300)
     await flushPromises()
+    expect(mockSearchApiKeys).toHaveBeenCalledTimes(1)
+    expect(mockSearchApiKeys).toHaveBeenLastCalledWith('')
 
-    // --- (b) Sort: active user should appear BEFORE deleted user ---
-    // Check the underlying component state via rendered DOM order
+    await input.setValue('key-b')
+    vi.advanceTimersByTime(300)
+    await flushPromises()
+    expect(mockSearchApiKeys).toHaveBeenLastCalledWith('key-b')
+
     const buttons = wrapper.findAll('.usage-filter-dropdown button[type="button"]')
-    const emailTexts = buttons.map((b) => b.text())
-
-    // active@test.com should be listed first
-    const activeIdx = emailTexts.findIndex((t) => t.includes('active@test.com'))
-    const deletedIdx = emailTexts.findIndex((t) => t.includes('gone@test.com'))
-    expect(activeIdx).toBeGreaterThanOrEqual(0)
-    expect(deletedIdx).toBeGreaterThanOrEqual(0)
-    expect(activeIdx).toBeLessThan(deletedIdx)
-
-    // --- (a) Label: deleted user's button shows the badge text ---
-    const deletedButton = buttons[deletedIdx]
-    expect(deletedButton.text()).toContain('deleted')
-
-    // active user's button does NOT show the badge text
-    const activeButton = buttons[activeIdx]
-    expect(activeButton.text()).not.toContain('deleted')
-
-    // --- (c) Selection: clicking active user button sets filters.user_id ---
-    await activeButton.trigger('click')
+    const target = buttons.find((b) => b.text().includes('key-b'))
+    expect(target).toBeDefined()
+    await target!.trigger('click')
     await flushPromises()
 
-    // The component emits 'update:modelValue' or modifies filters.user_id via toRef
-    // selectUser sets filters.value.user_id = u.id and emits 'change'
-    const changeEmits = wrapper.emitted('change')
-    expect(changeEmits).toBeTruthy()
-    expect(changeEmits!.length).toBeGreaterThan(0)
-
-    // Also confirm user_id was set by checking the emitted change came through
-    // (the component uses toRef so modelValue is mutated in place and 'change' is emitted)
-    expect(wrapper.props('modelValue').user_id).toBe(1)
-  })
-
-  it('keeps results from the latest user search when responses arrive out of order', async () => {
-    const firstSearch = deferred<Array<{ id: number; email: string; deleted: boolean }>>()
-    const secondSearch = deferred<Array<{ id: number; email: string; deleted: boolean }>>()
-    mockSearchUsers
-      .mockImplementationOnce(() => firstSearch.promise)
-      .mockImplementationOnce(() => secondSearch.promise)
-
-    const wrapper = mountFilters()
-    const input = wrapper.find('input[type="text"]')
-    await input.trigger('focus')
-
-    await input.setValue('a')
-    vi.advanceTimersByTime(300)
-    await flushPromises()
-
-    await input.setValue('ab')
-    vi.advanceTimersByTime(300)
-    await flushPromises()
-
-    secondSearch.resolve([{ id: 2, email: 'ab@test.com', deleted: false }])
-    await flushPromises()
-    expect(wrapper.text()).toContain('ab@test.com')
-
-    firstSearch.resolve([{ id: 1, email: 'a@test.com', deleted: false }])
-    await flushPromises()
-    expect(wrapper.text()).toContain('ab@test.com')
-    expect(wrapper.text()).not.toContain('a@test.com')
-  })
-
-  it('does not restore stale user results after the search is cleared', async () => {
-    const pendingSearch = deferred<Array<{ id: number; email: string; deleted: boolean }>>()
-    mockSearchUsers.mockImplementationOnce(() => pendingSearch.promise)
-
-    const wrapper = mountFilters()
-    const input = wrapper.find('input[type="text"]')
-    await input.trigger('focus')
-
-    await input.setValue('stale')
-    vi.advanceTimersByTime(300)
-    await flushPromises()
-
-    await input.setValue('')
-    vi.advanceTimersByTime(300)
-    await flushPromises()
-
-    pendingSearch.resolve([{ id: 3, email: 'stale@test.com', deleted: false }])
-    await flushPromises()
-    expect(wrapper.text()).not.toContain('stale@test.com')
+    expect(wrapper.props('modelValue').api_key_id).toBe(12)
+    expect(wrapper.emitted('change')).toBeTruthy()
   })
 })
 

@@ -98,12 +98,10 @@ const (
 
 // TotpService handles TOTP operations
 type TotpService struct {
-	userRepo          UserRepository
-	encryptor         SecretEncryptor
-	cache             TotpCache
-	settingService    *SettingService
-	emailService      *EmailService
-	emailQueueService *EmailQueueService
+	userRepo       UserRepository
+	encryptor      SecretEncryptor
+	cache          TotpCache
+	settingService *SettingService
 }
 
 // NewTotpService creates a new TOTP service
@@ -112,16 +110,12 @@ func NewTotpService(
 	encryptor SecretEncryptor,
 	cache TotpCache,
 	settingService *SettingService,
-	emailService *EmailService,
-	emailQueueService *EmailQueueService,
 ) *TotpService {
 	return &TotpService{
-		userRepo:          userRepo,
-		encryptor:         encryptor,
-		cache:             cache,
-		settingService:    settingService,
-		emailService:      emailService,
-		emailQueueService: emailQueueService,
+		userRepo:       userRepo,
+		encryptor:      encryptor,
+		cache:          cache,
+		settingService: settingService,
 	}
 }
 
@@ -141,22 +135,8 @@ func (s *TotpService) GetStatus(ctx context.Context, userID int64) (*TotpStatus,
 	}, nil
 }
 
-// usesEmailVerification 判断 TOTP 启用/停用时的身份校验方式。
-// 管理员一律使用密码校验：管理员账号的邮箱常为占位地址收不到验证码，
-// 且管理员凭证失守时攻击者往往同时控制通知邮箱，邮箱验证码不构成有效防线。
-// 普通用户维持原有行为：开启邮箱验证时用邮箱验证码，否则用密码。
-func (s *TotpService) usesEmailVerification(ctx context.Context, user *User) bool {
-	return user.Role != RoleAdmin && s.settingService.IsEmailVerifyEnabled(ctx)
-}
-
-// verifyIdentity 按 usesEmailVerification 的结果校验邮箱验证码或密码。
-func (s *TotpService) verifyIdentity(ctx context.Context, user *User, emailCode, password string) error {
-	if s.usesEmailVerification(ctx, user) {
-		if emailCode == "" {
-			return ErrVerifyCodeRequired
-		}
-		return s.emailService.VerifyCode(ctx, user.Email, emailCode)
-	}
+// verifyIdentity 用账号密码校验身份（邮箱验证码方式已移除）。
+func (s *TotpService) verifyIdentity(_ context.Context, user *User, _, password string) error {
 	if password == "" {
 		return ErrPasswordRequired
 	}
@@ -425,21 +405,6 @@ func (s *TotpService) CreateLoginSession(ctx context.Context, userID int64, emai
 	return s.createLoginSession(ctx, userID, email, nil)
 }
 
-// CreatePendingOAuthBindLoginSession creates a temporary 2FA session that will
-// finalize a pending OAuth bind after the TOTP code is verified.
-func (s *TotpService) CreatePendingOAuthBindLoginSession(
-	ctx context.Context,
-	userID int64,
-	email string,
-	pendingSessionToken string,
-	browserSessionKey string,
-) (string, error) {
-	return s.createLoginSession(ctx, userID, email, &PendingOAuthBindLoginSession{
-		PendingSessionToken: pendingSessionToken,
-		BrowserSessionKey:   browserSessionKey,
-	})
-}
-
 func (s *TotpService) createLoginSession(
 	ctx context.Context,
 	userID int64,
@@ -520,42 +485,4 @@ func generateRandomToken(byteLength int) (string, error) {
 		return "", err
 	}
 	return hex.EncodeToString(b), nil
-}
-
-// VerificationMethod represents the method required for TOTP operations
-type VerificationMethod struct {
-	Method string `json:"method"` // "email" or "password"
-}
-
-// GetVerificationMethod returns the verification method for TOTP operations.
-// 与 verifyIdentity 保持同一判定：管理员一律返回 password。
-func (s *TotpService) GetVerificationMethod(ctx context.Context, userID int64) (*VerificationMethod, error) {
-	user, err := s.userRepo.GetByID(ctx, userID)
-	if err != nil {
-		return nil, fmt.Errorf("get user: %w", err)
-	}
-	if s.usesEmailVerification(ctx, user) {
-		return &VerificationMethod{Method: "email"}, nil
-	}
-	return &VerificationMethod{Method: "password"}, nil
-}
-
-// SendVerifyCode sends an email verification code for TOTP operations
-func (s *TotpService) SendVerifyCode(ctx context.Context, userID int64, locale ...string) error {
-	// Check if email verification is enabled
-	if !s.settingService.IsEmailVerifyEnabled(ctx) {
-		return infraerrors.BadRequest("EMAIL_VERIFY_NOT_ENABLED", "email verification is not enabled")
-	}
-
-	// Get user email
-	user, err := s.userRepo.GetByID(ctx, userID)
-	if err != nil {
-		return fmt.Errorf("get user: %w", err)
-	}
-
-	// Get site name for email
-	siteName := s.settingService.GetSiteName(ctx)
-
-	// Send verification code via queue
-	return s.emailQueueService.EnqueueVerifyCode(user.Email, siteName, firstEmailLocale(locale))
 }

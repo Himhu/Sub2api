@@ -1,16 +1,10 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import LoginView from '../LoginView.vue'
-import EmailOAuthButtons from '@/components/auth/EmailOAuthButtons.vue'
-import LinuxDoOAuthSection from '@/components/auth/LinuxDoOAuthSection.vue'
-import OidcOAuthSection from '@/components/auth/OidcOAuthSection.vue'
-import DingTalkOAuthSection from '@/components/auth/DingTalkOAuthSection.vue'
-import WechatOAuthSection from '@/components/auth/WechatOAuthSection.vue'
-import OAuthCallbackView from '../OAuthCallbackView.vue'
 
-const { route, login, push, replace, exchangeCompletion } = vi.hoisted(() => ({
+const { route, login, push, replace } = vi.hoisted(() => ({
   route: { path: '/login', query: {} as Record<string, unknown> },
-  login: vi.fn(), push: vi.fn(), replace: vi.fn(), exchangeCompletion: vi.fn()
+  login: vi.fn(), push: vi.fn(), replace: vi.fn()
 }))
 vi.mock('vue-router', () => ({ useRoute: () => route, useRouter: () => ({ push, replace, currentRoute: { value: route } }) }))
 vi.mock('vue-i18n', () => ({
@@ -18,7 +12,7 @@ vi.mock('vue-i18n', () => ({
   useI18n: () => ({ t: (key: string) => key, locale: { value: 'en' } })
 }))
 vi.mock('@/stores', () => ({
-  useAuthStore: () => ({ login, loginWithPasskey: vi.fn(), login2FA: vi.fn(), setToken: vi.fn() }),
+  useAuthStore: () => ({ login, loginWithPasskey: vi.fn(), login2FA: vi.fn() }),
   useAppStore: () => ({ showError: vi.fn(), showSuccess: vi.fn(), showWarning: vi.fn(), cachedPublicSettings: {}, publicSettingsLoaded: true })
 }))
 vi.mock('@/api/client', () => ({ apiClient: { post: vi.fn() } }))
@@ -26,11 +20,8 @@ vi.mock('@/api/auth', async () => {
   const actual = await vi.importActual<typeof import('@/api/auth')>('@/api/auth')
   return {
     ...actual,
-    getPublicSettings: vi.fn().mockResolvedValue({ registration_enabled: false }),
-    isTotp2FARequired: () => false,
-    resolveWeChatOAuthStart: () => ({ mode: 'open' }),
-    exchangePendingOAuthCompletion: exchangeCompletion,
-    persistOAuthTokenContext: vi.fn()
+    getPublicSettings: vi.fn().mockResolvedValue({}),
+    isTotp2FARequired: () => false
   }
 })
 vi.mock('@/composables/useClipboard', () => ({ useClipboard: () => ({ copyToClipboard: vi.fn() }) }))
@@ -54,14 +45,13 @@ afterEach(() => {
   Object.defineProperty(window, 'location', { configurable: true, value: originalLocation })
 })
 
-describe('MCP authorization through existing sign-in flows', () => {
+describe('MCP authorization through the password sign-in flow', () => {
   it('returns to the original OAuth query after password login', async () => {
     const wrapper = mount(LoginView, {
       global: { stubs: {
         AuthLayout: { template: '<div><slot /><slot name="footer" /></div>' },
-        DingTalkOAuthSection: true, EmailOAuthButtons: true, Icon: true, LinuxDoOAuthSection: true,
-        LoginAgreementPrompt: true, OidcOAuthSection: true, RouterLink: true, TotpLoginModal: true,
-        TurnstileWidget: true, WechatOAuthSection: true
+        Icon: true, LoginAgreementPrompt: true, RouterLink: true, TotpLoginModal: true,
+        TurnstileWidget: true
       } }
     })
     mounted.push(wrapper)
@@ -72,34 +62,5 @@ describe('MCP authorization through existing sign-in flows', () => {
     await flushPromises()
     expect(login).toHaveBeenCalledTimes(1)
     expect(push).toHaveBeenCalledWith(authorizationPath)
-  })
-
-  it.each([
-    ['github', EmailOAuthButtons, { githubEnabled: true }],
-    ['google', EmailOAuthButtons, { googleEnabled: true }],
-    ['linuxdo', LinuxDoOAuthSection, {}],
-    ['oidc', OidcOAuthSection, {}],
-    ['dingtalk', DingTalkOAuthSection, {}],
-    ['wechat', WechatOAuthSection, {}]
-  ] as const)('preserves the entire return path when starting %s sign-in', async (provider, component, props) => {
-    const wrapper = mount(component, { props, global: { stubs: { Icon: true } } })
-    mounted.push(wrapper)
-    await wrapper.get('button').trigger('click')
-    const event = wrapper.emitted('start')?.[0]?.[0] as { provider: string; params: Record<string, string> }
-    expect(event.provider).toBe(provider)
-    expect(event.params.redirect).toBe(authorizationPath)
-    const { buildOAuthLoginStartURL } = await import('@/api/auth')
-    const start = new URL(buildOAuthLoginStartURL(event), 'https://platform.example.com')
-    expect(start.searchParams.get('redirect')).toBe(authorizationPath)
-  })
-
-  it('returns from successful social sign-in to the intact OAuth consent request', async () => {
-    route.path = '/auth/oauth/callback'
-    route.query = {}
-    exchangeCompletion.mockResolvedValue({ access_token: 'test-session', redirect: authorizationPath })
-    const wrapper = mount(OAuthCallbackView)
-    mounted.push(wrapper)
-    await flushPromises()
-    expect(replace).toHaveBeenCalledWith(authorizationPath)
   })
 })

@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newGatewayRecordUsageServiceForTest(usageRepo UsageLogRepository, userRepo UserRepository, subRepo UserSubscriptionRepository) *GatewayService {
+func newGatewayRecordUsageServiceForTest(usageRepo UsageLogRepository, userRepo UserRepository, subRepo *openAIRecordUsageSubRepoStub) *GatewayService {
 	cfg := &config.Config{}
 	cfg.Default.RateMultiplier = 1.1
 	return NewGatewayService(
@@ -23,7 +23,6 @@ func newGatewayRecordUsageServiceForTest(usageRepo UsageLogRepository, userRepo 
 		usageRepo,
 		nil,
 		userRepo,
-		subRepo,
 		nil,
 		nil,
 		cfg,
@@ -44,12 +43,11 @@ func newGatewayRecordUsageServiceForTest(usageRepo UsageLogRepository, userRepo 
 		nil,
 		nil,
 		nil,
-		nil,
 		nil, // userPlatformQuotaRepo
 	)
 }
 
-func newGatewayRecordUsageServiceWithBillingRepoForTest(usageRepo UsageLogRepository, billingRepo UsageBillingRepository, userRepo UserRepository, subRepo UserSubscriptionRepository) *GatewayService {
+func newGatewayRecordUsageServiceWithBillingRepoForTest(usageRepo UsageLogRepository, billingRepo UsageBillingRepository, userRepo UserRepository, subRepo *openAIRecordUsageSubRepoStub) *GatewayService {
 	svc := newGatewayRecordUsageServiceForTest(usageRepo, userRepo, subRepo)
 	svc.usageBillingRepo = billingRepo
 	return svc

@@ -147,14 +147,12 @@ export default {
     cost: 'Cost',
     // Status
     quotaMode: 'Key Quota Mode',
-    walletBalance: 'Wallet Balance',
+    unlimited: 'Unlimited',
     // Ring card titles
     totalQuota: 'Total Quota',
     limit5h: '5-Hour Limit',
     limitDaily: 'Daily Limit',
     limit7d: '7-Day Limit',
-    limitWeekly: 'Weekly Limit',
-    limitMonthly: 'Monthly Limit',
     // Detail rows
     remainingQuota: 'Remaining Quota',
     expiresAt: 'Expires At',
@@ -162,9 +160,7 @@ export default {
     daysLeft: '({days} days)',
     usedQuota: 'Used Quota',
     resetNow: 'Resetting soon',
-    subscriptionType: 'Subscription Type',
     billingType: 'Billing Type',
-    subscriptionExpires: 'Subscription Expires',
     // Usage stat cells
     todayRequests: 'Today Requests',
     todayInputTokens: 'Today Input',

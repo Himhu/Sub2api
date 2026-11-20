@@ -37,7 +37,7 @@ const messages: Record<string, string> = {
   'keyUsage.cacheWriteTokens': 'Cache Write',
   'keyUsage.cost': 'Cost',
   'keyUsage.quotaMode': 'Key Quota Mode',
-  'keyUsage.walletBalance': 'Wallet Balance',
+  'keyUsage.unlimited': 'Unlimited',
   'keyUsage.totalQuota': 'Total Quota',
   'keyUsage.limit5h': '5-Hour Limit',
   'keyUsage.limitDaily': 'Daily Limit',
@@ -240,7 +240,7 @@ describe('KeyUsageView daily detail', () => {
   })
 })
 
-describe('KeyUsageView subscription feature flag', () => {
+describe('KeyUsageView wallet row label', () => {
   beforeEach(() => {
     localStorage.clear()
     Object.defineProperty(window, 'matchMedia', {
@@ -251,10 +251,9 @@ describe('KeyUsageView subscription feature flag', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
-        mode: 'wallet',
+        mode: 'unrestricted',
         isValid: true,
         status: 'active',
-        balance: 5.5,
         usage: {
           today: { requests: 0, input_tokens: 0, output_tokens: 0, cache_creation_tokens: 0, cache_read_tokens: 0, total_tokens: 0, actual_cost: 0 },
           total: { requests: 0, input_tokens: 0, output_tokens: 0, cache_creation_tokens: 0, cache_read_tokens: 0, total_tokens: 0, actual_cost: 0 },
@@ -288,21 +287,13 @@ describe('KeyUsageView subscription feature flag', () => {
     return wrapper
   }
 
-  it('labels the wallet row "Subscription Type" while subscriptions are enabled', async () => {
-    const wrapper = await mountAndQuery()
-
-    expect(wrapper.text()).toContain('Subscription Type')
-    expect(wrapper.text()).toContain('Wallet Balance')
-    wrapper.unmount()
-  })
-
-  it('drops the "Subscription" wording from the wallet row when subscriptions are disabled', async () => {
-    appStoreState.cachedPublicSettings = { subscription_enabled: false }
+  it('labels the unrestricted row "Billing Type" without subscription wording', async () => {
     const wrapper = await mountAndQuery()
 
     expect(wrapper.text()).toContain('Billing Type')
     expect(wrapper.text()).not.toContain('Subscription Type')
-    expect(wrapper.text()).toContain('Wallet Balance')
+    expect(wrapper.text()).toContain('Unlimited')
+    expect(wrapper.text()).not.toContain('Wallet Balance')
     wrapper.unmount()
   })
 })

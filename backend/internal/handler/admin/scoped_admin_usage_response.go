@@ -15,7 +15,7 @@ func scopedAdminUsageLogResponse(record *service.UsageLog) gin.H {
 	}
 	// 在转换前移除关联，避免构造含原始密钥、用户余额等内容的嵌套 DTO。
 	flat := *record
-	flat.User, flat.APIKey, flat.Group, flat.Subscription, flat.Account = nil, nil, nil, nil, nil
+	flat.User, flat.APIKey, flat.Group, flat.Account = nil, nil, nil, nil
 	usage := dto.UsageLogFromServiceAdmin(&flat)
 	return gin.H{
 		"id":                           usage.ID,

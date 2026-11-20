@@ -518,7 +518,6 @@ type ContentModerationService struct {
 	userRepo                 UserRepository
 	proxyRepo                ProxyRepository
 	authCacheInvalidator     APIKeyAuthCacheInvalidator
-	emailService             *EmailService
 	httpClient               *http.Client
 	moderationProxyCache     atomic.Pointer[moderationProxyURLCacheEntry]
 	asyncQueue               chan contentModerationTask
@@ -592,7 +591,6 @@ func NewContentModerationService(
 	userRepo UserRepository,
 	proxyRepo ProxyRepository,
 	authCacheInvalidator APIKeyAuthCacheInvalidator,
-	emailService *EmailService,
 ) *ContentModerationService {
 	svc := &ContentModerationService{
 		settingRepo:          settingRepo,
@@ -602,7 +600,6 @@ func NewContentModerationService(
 		userRepo:             userRepo,
 		proxyRepo:            proxyRepo,
 		authCacheInvalidator: authCacheInvalidator,
-		emailService:         emailService,
 		httpClient:           servertiming.InstrumentClient(nil),
 		workerCount:          maxContentModerationWorkerCount,
 		asyncQueue:           make(chan contentModerationTask, maxContentModerationQueueSize),
@@ -1955,10 +1952,8 @@ func (s *ContentModerationService) persistContentModerationLog(ctx context.Conte
 			slog.Warn("content_moderation.record_hash_failed", "user_id", contentModerationEmailUserID(log), "endpoint", log.Endpoint, "error", err)
 		}
 	}
-	autoBanJustApplied := false
 	if applySideEffects {
-		autoBanJustApplied = s.applyFlaggedAccountSideEffects(ctx, cfg, log)
-		s.sendFlaggedNotificationSideEffects(ctx, cfg, log, autoBanJustApplied)
+		s.applyFlaggedAccountSideEffects(ctx, cfg, log)
 	}
 	if s.repo != nil {
 		if err := s.repo.CreateLog(ctx, log); err != nil {
@@ -2006,81 +2001,6 @@ func (s *ContentModerationService) applyFlaggedAccountSideEffects(ctx context.Co
 		log.AutoBanned = true
 	}
 	return autoBanJustApplied
-}
-
-func (s *ContentModerationService) sendFlaggedNotificationSideEffects(ctx context.Context, cfg *ContentModerationConfig, log *ContentModerationLog, autoBanJustApplied bool) {
-	if s == nil || cfg == nil || log == nil || !log.Flagged {
-		return
-	}
-	if s.emailService == nil || strings.TrimSpace(log.UserEmail) == "" {
-		return
-	}
-	emailSent := false
-	if cfg.EmailOnHit {
-		if err := s.sendViolationEmail(ctx, cfg, log); err != nil {
-			slog.Warn("content_moderation.email_failed", "user_id", *log.UserID, "email", log.UserEmail, "error", err)
-		} else {
-			emailSent = true
-		}
-	}
-	if autoBanJustApplied {
-		if err := s.sendAccountDisabledEmail(ctx, cfg, log); err != nil {
-			slog.Warn("content_moderation.ban_email_failed", "user_id", *log.UserID, "email", log.UserEmail, "error", err)
-		} else {
-			emailSent = true
-		}
-	}
-	log.EmailSent = emailSent
-}
-
-func (s *ContentModerationService) sendViolationEmail(ctx context.Context, cfg *ContentModerationConfig, log *ContentModerationLog) error {
-	siteName := s.siteName(ctx)
-	if s.emailService.notificationEmailService != nil {
-		if err := s.emailService.notificationEmailService.Send(ctx, NotificationEmailSendInput{
-			Event:          NotificationEmailEventContentModerationViolation,
-			RecipientEmail: log.UserEmail,
-			RecipientName:  emailRecipientName(log.UserEmail),
-			UserID:         contentModerationEmailUserID(log),
-			SourceType:     "content_moderation",
-			SourceID:       contentModerationEmailSourceID(log),
-			Variables:      contentModerationEmailVariables(log, cfg),
-		}); err == nil {
-			return nil
-		} else {
-			if !shouldFallbackNotificationEmail(err) {
-				return err
-			}
-			slog.Warn("template content moderation violation email failed; falling back to built-in body", "log_id", log.ID, "recipient_hash", notificationEmailHash(log.UserEmail), "err", err.Error())
-		}
-	}
-	subject := fmt.Sprintf("[%s] 账户风控提醒 / Risk Control Notice", sanitizeEmailHeader(siteName))
-	body := buildContentModerationViolationEmailBody(siteName, log, cfg)
-	return s.emailService.SendEmail(ctx, log.UserEmail, subject, body)
-}
-
-func (s *ContentModerationService) sendAccountDisabledEmail(ctx context.Context, cfg *ContentModerationConfig, log *ContentModerationLog) error {
-	siteName := s.siteName(ctx)
-	if s.emailService.notificationEmailService != nil {
-		if err := s.emailService.notificationEmailService.Send(ctx, NotificationEmailSendInput{
-			Event:          NotificationEmailEventContentModerationDisabled,
-			RecipientEmail: log.UserEmail,
-			RecipientName:  emailRecipientName(log.UserEmail),
-			UserID:         contentModerationEmailUserID(log),
-			SourceType:     "content_moderation",
-			SourceID:       contentModerationEmailSourceID(log),
-			Variables:      contentModerationEmailVariables(log, cfg),
-		}); err == nil {
-			return nil
-		} else {
-			if !shouldFallbackNotificationEmail(err) {
-				return err
-			}
-			slog.Warn("template content moderation disabled email failed; falling back to built-in body", "log_id", log.ID, "recipient_hash", notificationEmailHash(log.UserEmail), "err", err.Error())
-		}
-	}
-	subject := fmt.Sprintf("[%s] 账户已被禁用 / Account Disabled", sanitizeEmailHeader(siteName))
-	body := buildContentModerationAccountDisabledEmailBody(siteName, log, cfg)
-	return s.emailService.SendEmail(ctx, log.UserEmail, subject, body)
 }
 
 func contentModerationEmailUserID(log *ContentModerationLog) int64 {
@@ -3111,67 +3031,14 @@ func (s *ContentModerationService) RecordCyberPolicyEvent(ctx context.Context, i
 	}
 	// 开关开时 cyber_policy 不参与封号计数：当次不判定（此处跳过），
 	// 历史行由 CountFlaggedByUserSince 的 excludeCyberPolicy 排除。
-	autoBanned := false
 	if in.LogOnly {
 		log.Mode = ContentModerationModeCyberLogOnly
 	}
 	if !in.LogOnly && !cfg.CyberPolicyExcludeFromBanCount {
-		autoBanned = s.applyFlaggedAccountSideEffects(ctx, cfg, log)
+		s.applyFlaggedAccountSideEffects(ctx, cfg, log)
 	}
 	log.EmailSent = false
-	logPersisted := true
 	if err := s.repo.CreateLog(ctx, log); err != nil {
-		logPersisted = false
 		slog.Warn("content_moderation.cyber_create_log_failed", "user_id", in.UserID, "error", err)
 	}
-	emailSent := false
-	if !in.LogOnly && s.emailService != nil && strings.TrimSpace(log.UserEmail) != "" {
-		if err := s.sendCyberPolicyEmail(ctx, log); err != nil {
-			slog.Warn("content_moderation.cyber_email_failed", "user_id", in.UserID, "error", err)
-		} else {
-			emailSent = true
-		}
-		if autoBanned {
-			if err := s.sendAccountDisabledEmail(ctx, cfg, log); err != nil {
-				slog.Warn("content_moderation.cyber_ban_email_failed", "user_id", in.UserID, "error", err)
-			} else {
-				emailSent = true
-			}
-		}
-	}
-	if logPersisted && emailSent {
-		if err := s.repo.UpdateLogEmailSent(ctx, log.ID, true); err != nil {
-			slog.Warn("content_moderation.cyber_update_email_sent_failed", "log_id", log.ID, "error", err)
-		}
-	}
-}
-
-func (s *ContentModerationService) sendCyberPolicyEmail(ctx context.Context, log *ContentModerationLog) error {
-	siteName := s.siteName(ctx)
-	if s.emailService.notificationEmailService != nil {
-		variables := map[string]string{
-			"triggered_at":     log.CreatedAt.UTC().Format(time.RFC3339),
-			"model":            defaultContentModerationString(log.Model, "-"),
-			"group_name":       defaultContentModerationString(log.GroupName, "-"),
-			"upstream_message": defaultContentModerationString(log.Error, "-"),
-		}
-		err := s.emailService.notificationEmailService.Send(ctx, NotificationEmailSendInput{
-			Event:          NotificationEmailEventCyberPolicyNotice,
-			RecipientEmail: log.UserEmail,
-			RecipientName:  emailRecipientName(log.UserEmail),
-			UserID:         contentModerationEmailUserID(log),
-			SourceType:     "content_moderation",
-			SourceID:       contentModerationEmailSourceID(log),
-			Variables:      variables,
-		})
-		if err == nil {
-			return nil
-		}
-		if !shouldFallbackNotificationEmail(err) {
-			return err
-		}
-		slog.Warn("template cyber policy email failed; falling back", "err", err.Error())
-	}
-	subject := fmt.Sprintf("[%s] 网络安全策略拦截 / Cyber Policy Notice", sanitizeEmailHeader(siteName))
-	return s.emailService.SendEmail(ctx, log.UserEmail, subject, buildCyberPolicyNoticeEmailBody(siteName, log))
 }

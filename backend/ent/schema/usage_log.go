@@ -215,10 +215,6 @@ func (UsageLog) Edges() []ent.Edge {
 			Ref("usage_logs").
 			Field("group_id").
 			Unique(),
-		edge.From("subscription", UserSubscription.Type).
-			Ref("usage_logs").
-			Field("subscription_id").
-			Unique(),
 	}
 }
 

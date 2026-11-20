@@ -6,10 +6,8 @@ import LoginView from '@/views/auth/LoginView.vue'
 const loginMock = vi.fn()
 const loginWithPasskeyMock = vi.fn()
 const getPublicSettingsMock = vi.fn()
-const startOAuthLoginMock = vi.fn()
 const verifyActionMock = vi.fn()
 const captchaResetMock = vi.fn()
-const locationState = { href: 'http://localhost/login' }
 
 vi.mock('vue-router', () => ({
   useRouter: () => ({
@@ -45,9 +43,7 @@ vi.mock('@/api/auth', async () => {
   return {
     ...actual,
     getPublicSettings: (...args: unknown[]) => getPublicSettingsMock(...args),
-    startOAuthLogin: (...args: unknown[]) => startOAuthLoginMock(...args),
-    isTotp2FARequired: () => false,
-    isWeChatWebOAuthEnabled: () => false
+    isTotp2FARequired: () => false
   }
 })
 
@@ -61,20 +57,6 @@ const CaptchaChallengeStub = defineComponent({
   }
 })
 
-const OAuthButtonStub = defineComponent({
-  emits: ['start'],
-  setup(_, { emit }) {
-    return () => h('button', {
-      type: 'button',
-      'data-testid': 'oauth-start',
-      onClick: () => emit('start', {
-        provider: 'github',
-        params: { redirect: '/dashboard' }
-      })
-    })
-  }
-})
-
 function mountLogin() {
   return mount(LoginView, {
     global: {
@@ -84,12 +66,7 @@ function mountLogin() {
         TurnstileWidget: CaptchaChallengeStub,
         Icon: true,
         LoginAgreementPrompt: true,
-        TotpLoginModal: true,
-        EmailOAuthButtons: OAuthButtonStub,
-        LinuxDoOAuthSection: true,
-        DingTalkOAuthSection: true,
-        OidcOAuthSection: true,
-        WechatOAuthSection: true
+        TotpLoginModal: true
       }
     }
   })
@@ -100,7 +77,6 @@ describe('Tencent captcha action gate', () => {
     loginMock.mockReset()
     loginWithPasskeyMock.mockReset()
     getPublicSettingsMock.mockReset()
-    startOAuthLoginMock.mockReset()
     verifyActionMock.mockReset()
     captchaResetMock.mockReset()
     getPublicSettingsMock.mockResolvedValue({
@@ -109,23 +85,14 @@ describe('Tencent captcha action gate', () => {
       tencent_captcha_enabled: true,
       tencent_captcha_app_id: 'tencent-app-id',
       backend_mode_enabled: false,
-      password_reset_enabled: false,
-      passkey_enabled: true,
-      github_oauth_enabled: true,
-      google_oauth_enabled: false
+      passkey_enabled: true
     })
     loginMock.mockResolvedValue({})
     loginWithPasskeyMock.mockResolvedValue({})
-    startOAuthLoginMock.mockResolvedValue({ authorize_url: 'https://github.example/authorize' })
     verifyActionMock.mockResolvedValue({ token: 'ticket-1', randstr: '@rand-1' })
     Object.defineProperty(window, 'PublicKeyCredential', {
       configurable: true,
       value: class PublicKeyCredential {}
-    })
-    locationState.href = 'http://localhost/login'
-    Object.defineProperty(window, 'location', {
-      configurable: true,
-      value: locationState
     })
   })
 
@@ -168,37 +135,6 @@ describe('Tencent captcha action gate', () => {
 
     expect(verifyActionMock).not.toHaveBeenCalled()
     expect(loginMock).not.toHaveBeenCalled()
-  })
-
-  it('starts OAuth through the Tencent gate before navigating', async () => {
-    const wrapper = mountLogin()
-    await flushPromises()
-
-    await wrapper.get('[data-testid="oauth-start"]').trigger('click')
-    await flushPromises()
-
-    expect(verifyActionMock).toHaveBeenCalledOnce()
-    expect(startOAuthLoginMock).toHaveBeenCalledWith(
-      { provider: 'github', params: { redirect: '/dashboard' } },
-      {
-        tencent_captcha_ticket: 'ticket-1',
-        tencent_captcha_randstr: '@rand-1'
-      }
-    )
-    expect(locationState.href).toBe('https://github.example/authorize')
-    expect(captchaResetMock).toHaveBeenCalledOnce()
-  })
-
-  it('does not start OAuth when Tencent captcha is closed', async () => {
-    verifyActionMock.mockResolvedValue(null)
-    const wrapper = mountLogin()
-    await flushPromises()
-
-    await wrapper.get('[data-testid="oauth-start"]').trigger('click')
-    await flushPromises()
-
-    expect(startOAuthLoginMock).not.toHaveBeenCalled()
-    expect(locationState.href).toBe('http://localhost/login')
   })
 
   it('passes a fresh Tencent proof to Passkey login', async () => {

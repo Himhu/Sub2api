@@ -259,10 +259,10 @@ func newMCPOAuthHTTPFixture(t *testing.T, role string) *mcpOAuthHTTPFixture {
 	oauth, repo, users := newMCPRouteOAuthService(role)
 	// Administrator write grants always pass the real step-up gate.
 	users.user.TotpEnabled = true
-	totp := service.NewTotpService(users, nil, mcpOAuthRouteStepUpCache{}, settings, nil, nil)
+	totp := service.NewTotpService(users, nil, mcpOAuthRouteStepUpCache{}, settings)
 	h := mcpRouteHandlers()
 	h.MCPOAuth = handler.NewMCPOAuthHandler(oauth, totp, service.NewUserService(users, nil, nil, nil), settings, cfg)
-	h.APIKey = handler.NewAPIKeyHandler(service.NewAPIKeyService(&mcpRouteAPIKeyRepo{}, nil, nil, nil, nil, nil, nil))
+	h.APIKey = handler.NewAPIKeyHandler(service.NewAPIKeyService(&mcpRouteAPIKeyRepo{}, nil, nil, nil, nil, nil))
 	mr := miniredis.RunT(t)
 	rdb := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	t.Cleanup(func() { _ = rdb.Close() })
@@ -454,7 +454,7 @@ func TestMCPOAuthHTTPPermissionAndCredentialBoundaries(t *testing.T) {
 	// Use the real production JWT middleware to prove MCP access credentials
 	// cannot become browser REST credentials, even for an administrator owner.
 	rest := gin.New()
-	auth := service.NewAuthService(nil, nil, nil, nil, f.cfg, f.settings, nil, nil, nil, nil, nil, nil, nil)
+	auth := service.NewAuthService(nil, nil, nil, f.cfg, f.settings, nil, nil)
 	jwtAuth := middleware.NewJWTAuthMiddleware(auth, nil, f.settings, nil)
 	RegisterUserRoutes(rest.Group("/api/v1"), f.handlers, jwtAuth, middleware.AuditLogMiddleware(mcpRouteNext), f.settings, nil)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/user/mcp/grants", nil)

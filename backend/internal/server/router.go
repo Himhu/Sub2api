@@ -30,7 +30,6 @@ func SetupRouter(
 	auditLog middleware2.AuditLogMiddleware,
 	stepUpAuth middleware2.StepUpAuthMiddleware,
 	apiKeyService *service.APIKeyService,
-	subscriptionService *service.SubscriptionService,
 	opsService *service.OpsService,
 	settingService *service.SettingService,
 	compositeResolver *service.CompositeRouteResolver,
@@ -90,7 +89,7 @@ func SetupRouter(
 	}
 
 	// 注册路由
-	registerRoutes(r, handlers, jwtAuth, optionalJWTAuth, adminAuth, apiKeyAuth, auditLog, stepUpAuth, apiKeyService, subscriptionService, opsService, settingService, compositeResolver, cfg, redisClient)
+	registerRoutes(r, handlers, jwtAuth, optionalJWTAuth, adminAuth, apiKeyAuth, auditLog, stepUpAuth, apiKeyService, opsService, settingService, compositeResolver, cfg, redisClient)
 
 	return r
 }
@@ -106,7 +105,6 @@ func registerRoutes(
 	auditLog middleware2.AuditLogMiddleware,
 	stepUpAuth middleware2.StepUpAuthMiddleware,
 	apiKeyService *service.APIKeyService,
-	subscriptionService *service.SubscriptionService,
 	opsService *service.OpsService,
 	settingService *service.SettingService,
 	compositeResolver *service.CompositeRouteResolver,
@@ -130,8 +128,7 @@ func registerRoutes(
 	routes.RegisterAdminRoutes(v1, h, adminAuth, auditLog, stepUpAuth, settingService, panelRateLimiter)
 	routes.RegisterMCPRoutes(v1, h, auditLog, stepUpAuth, settingService, panelRateLimiter, cfg.CORS.AllowedOrigins, redisClient)
 	routes.RegisterMCPOAuthRoutes(r, v1, h, redisClient)
-	routes.RegisterGatewayRoutes(r, h, apiKeyAuth, apiKeyService, subscriptionService, opsService, settingService, compositeResolver, cfg)
-	routes.RegisterPaymentRoutes(v1, h.Payment, h.PaymentWebhook, h.Admin.Payment, jwtAuth, adminAuth, auditLog, settingService, panelRateLimiter, redisClient)
+	routes.RegisterGatewayRoutes(r, h, apiKeyAuth, apiKeyService, opsService, settingService, compositeResolver, cfg)
 
 	handler.RegisterPageRoutes(v1, cfg.Pricing.DataDir, gin.HandlerFunc(jwtAuth), gin.HandlerFunc(adminAuth), settingService)
 }

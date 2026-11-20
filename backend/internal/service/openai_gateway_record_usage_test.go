@@ -162,9 +162,9 @@ func (s *openAIRecordUsageUserRepoStub) SetBalance(ctx context.Context, id int64
 	panic("unexpected SetBalance call")
 }
 
+// openAIRecordUsageSubRepoStub 是订阅仓储裁剪后保留的占位：订阅计费已移除，
+// incrementCalls 恒为 0，仅用于让既有用例继续断言“未走订阅扣费”。
 type openAIRecordUsageSubRepoStub struct {
-	UserSubscriptionRepository
-
 	incrementCalls int
 	incrementErr   error
 	lastCtxErr     error
@@ -219,7 +219,7 @@ func i64p(v int64) *int64 {
 	return &v
 }
 
-func newOpenAIRecordUsageServiceForTest(usageRepo UsageLogRepository, userRepo UserRepository, subRepo UserSubscriptionRepository, rateRepo UserGroupRateRepository) *OpenAIGatewayService {
+func newOpenAIRecordUsageServiceForTest(usageRepo UsageLogRepository, userRepo UserRepository, subRepo *openAIRecordUsageSubRepoStub, rateRepo UserGroupRateRepository) *OpenAIGatewayService {
 	cfg := &config.Config{}
 	cfg.Default.RateMultiplier = 1.1
 	svc := NewOpenAIGatewayService(
@@ -227,7 +227,6 @@ func newOpenAIRecordUsageServiceForTest(usageRepo UsageLogRepository, userRepo U
 		usageRepo,
 		nil,
 		userRepo,
-		subRepo,
 		rateRepo,
 		nil,
 		cfg,
@@ -238,7 +237,6 @@ func newOpenAIRecordUsageServiceForTest(usageRepo UsageLogRepository, userRepo U
 		&BillingCacheService{},
 		nil,
 		&DeferredService{},
-		nil,
 		nil,
 		nil,
 		nil,
@@ -267,7 +265,7 @@ func openAIRecordUsageAPIKeyWithGroup(svc *OpenAIGatewayService, id int64, group
 	}
 }
 
-func newOpenAIRecordUsageServiceWithBillingRepoForTest(usageRepo UsageLogRepository, billingRepo UsageBillingRepository, userRepo UserRepository, subRepo UserSubscriptionRepository, rateRepo UserGroupRateRepository) *OpenAIGatewayService {
+func newOpenAIRecordUsageServiceWithBillingRepoForTest(usageRepo UsageLogRepository, billingRepo UsageBillingRepository, userRepo UserRepository, subRepo *openAIRecordUsageSubRepoStub, rateRepo UserGroupRateRepository) *OpenAIGatewayService {
 	svc := newOpenAIRecordUsageServiceForTest(usageRepo, userRepo, subRepo, rateRepo)
 	svc.usageBillingRepo = billingRepo
 	return svc
@@ -1998,35 +1996,6 @@ func TestOpenAIGatewayServiceRecordUsage_UnpricedTokenModelFallsBackToZeroCostUs
 	require.Zero(t, usageRepo.lastLog.ActualCost)
 	require.Equal(t, 0, userRepo.deductCalls)
 	require.Equal(t, 0, subRepo.incrementCalls)
-}
-
-func TestOpenAIGatewayServiceRecordUsage_SubscriptionBillingSetsSubscriptionFields(t *testing.T) {
-	usageRepo := &openAIRecordUsageLogRepoStub{inserted: true}
-	userRepo := &openAIRecordUsageUserRepoStub{}
-	subRepo := &openAIRecordUsageSubRepoStub{}
-	svc := newOpenAIRecordUsageServiceForTest(usageRepo, userRepo, subRepo, nil)
-	subscription := &UserSubscription{ID: 99}
-
-	err := svc.RecordUsage(context.Background(), &OpenAIRecordUsageInput{
-		Result: &OpenAIForwardResult{
-			RequestID: "resp_subscription_billing",
-			Usage:     OpenAIUsage{InputTokens: 10, OutputTokens: 5},
-			Model:     "gpt-5.1",
-			Duration:  time.Second,
-		},
-		APIKey:       &APIKey{ID: 100, GroupID: i64p(88), Group: &Group{ID: 88, SubscriptionType: SubscriptionTypeSubscription, RateMultiplier: 1.0}},
-		User:         &User{ID: 200},
-		Account:      &Account{ID: 300},
-		Subscription: subscription,
-	})
-
-	require.NoError(t, err)
-	require.NotNil(t, usageRepo.lastLog)
-	require.Equal(t, BillingTypeSubscription, usageRepo.lastLog.BillingType)
-	require.NotNil(t, usageRepo.lastLog.SubscriptionID)
-	require.Equal(t, subscription.ID, *usageRepo.lastLog.SubscriptionID)
-	require.Equal(t, 1, subRepo.incrementCalls)
-	require.Equal(t, 0, userRepo.deductCalls)
 }
 
 func TestOpenAIGatewayServiceRecordUsage_SimpleModeSkipsBillingAfterPersist(t *testing.T) {

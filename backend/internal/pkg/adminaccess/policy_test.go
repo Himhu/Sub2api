@@ -93,17 +93,17 @@ func TestScopedAdminPolicyValidationAndGlobalIsolation(t *testing.T) {
 	require.NoError(t, ValidatePolicy(Policy{}))
 	for _, p := range []Policy{
 		{GlobalPermissions: []string{"*"}}, {GlobalPermissions: []string{"accounts.read"}},
-		{Rules: []Rule{{Permissions: []string{"users.read"}}}},
+		{Rules: []Rule{{Permissions: []string{"proxies.read"}}}},
 		{Rules: []Rule{{Permissions: []string{"accounts.read"}, GroupIDs: []int64{-1}}}},
 		{Rules: []Rule{{AccountTypes: []string{"future_type"}}}},
 	} {
 		require.Error(t, ValidatePolicy(p))
 	}
-	p := Policy{GlobalPermissions: []string{"users.read"}}
+	p := Policy{GlobalPermissions: []string{"proxies.read"}}
 	require.NoError(t, ValidatePolicy(p))
-	require.True(t, RouteAllowed(p, "GET", "/api/v1/admin/users"))
-	require.False(t, RouteAllowed(p, "PUT", "/api/v1/admin/users/:id"))
-	require.False(t, RouteAllowed(p, "POST", "/api/v1/admin/users/:id/balance"))
+	require.True(t, RouteAllowed(p, "GET", "/api/v1/admin/proxies"))
+	require.False(t, RouteAllowed(p, "PUT", "/api/v1/admin/proxies/:id"))
+	require.False(t, RouteAllowed(p, "POST", "/api/v1/admin/proxies"))
 	require.False(t, RouteAllowed(p, "GET", "/api/v1/admin/accounts/:id"))
 	all := Policy{}
 	for _, perm := range PermissionCatalog() {

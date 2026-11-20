@@ -194,26 +194,6 @@ export default {
       "label": "读取全站经营报表",
       "category": "报表"
     },
-    "users_dread": {
-      "label": "读取全站用户资料（含联系方式）",
-      "category": "用户"
-    },
-    "users_dbalance_dread": {
-      "label": "读取全站用户余额及流水",
-      "category": "财务"
-    },
-    "users_dbalance_dwrite": {
-      "label": "增减任意用户余额",
-      "category": "财务"
-    },
-    "users_dquotas_dread": {
-      "label": "读取全站用户平台额度",
-      "category": "用户"
-    },
-    "users_dquotas_dwrite": {
-      "label": "修改与重置全站用户平台额度",
-      "category": "用户"
-    },
     "groups_dread": {
       "label": "读取所有分组配置",
       "category": "分组"
@@ -221,78 +201,6 @@ export default {
     "usage_dread": {
       "label": "读取全站用量明细及用户用量",
       "category": "报表"
-    },
-    "payment_dread": {
-      "label": "读取全站支付订单与报表",
-      "category": "财务"
-    },
-    "payment_dcancel": {
-      "label": "取消支付订单",
-      "category": "财务"
-    },
-    "payment_dfulfill": {
-      "label": "重新履约支付订单",
-      "category": "财务"
-    },
-    "payment_drefund": {
-      "label": "发起退款及确认退款结果",
-      "category": "财务"
-    },
-    "payment_dplans_dread": {
-      "label": "读取全部支付套餐",
-      "category": "财务"
-    },
-    "payment_dplans_dwrite": {
-      "label": "创建、修改和删除支付套餐",
-      "category": "财务"
-    },
-    "subscriptions_dread": {
-      "label": "读取全站订阅记录",
-      "category": "订阅"
-    },
-    "subscriptions_dassign": {
-      "label": "分配全站用户订阅",
-      "category": "订阅"
-    },
-    "subscriptions_dextend": {
-      "label": "延长订阅有效期",
-      "category": "订阅"
-    },
-    "subscriptions_drevoke": {
-      "label": "撤销订阅",
-      "category": "订阅"
-    },
-    "subscriptions_drestore": {
-      "label": "恢复订阅",
-      "category": "订阅"
-    },
-    "subscriptions_dreset": {
-      "label": "重置订阅额度",
-      "category": "订阅"
-    },
-    "announcements_dread": {
-      "label": "读取所有公告与阅读记录",
-      "category": "内容"
-    },
-    "announcements_dwrite": {
-      "label": "创建、发布与修改公告",
-      "category": "内容"
-    },
-    "announcements_ddelete": {
-      "label": "删除公告",
-      "category": "内容"
-    },
-    "promo_dread": {
-      "label": "读取优惠码及使用记录",
-      "category": "财务"
-    },
-    "promo_dwrite": {
-      "label": "创建与修改优惠码权益",
-      "category": "财务"
-    },
-    "promo_ddelete": {
-      "label": "删除优惠码",
-      "category": "财务"
     },
     "ops_dread": {
       "label": "读取全站运维指标",
@@ -313,10 +221,6 @@ export default {
     "ops_dalerts_dwrite": {
       "label": "修改告警规则、状态与静默",
       "category": "监控"
-    },
-    "system_dread": {
-      "label": "读取系统版本与可更新版本",
-      "category": "系统"
     }
   },
   "listSeparator": "、"

@@ -20,7 +20,7 @@ func TestAdminAuthJWTValidatesTokenVersion(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	cfg := &config.Config{JWT: config.JWTConfig{Secret: "test-secret", ExpireHour: 1}}
-	authService := service.NewAuthService(nil, nil, nil, nil, cfg, nil, nil, nil, nil, nil, nil, nil, nil)
+	authService := service.NewAuthService(nil, nil, nil, cfg, nil, nil, nil)
 
 	admin := &service.User{
 		ID:           1,
@@ -234,10 +234,6 @@ func (s *stubUserRepo) RemoveGroupFromUserAllowedGroups(ctx context.Context, use
 
 func (s *stubUserRepo) AddGroupToAllowedGroups(ctx context.Context, userID int64, groupID int64) error {
 	panic("unexpected AddGroupToAllowedGroups call")
-}
-
-func (s *stubUserRepo) ListUserAuthIdentities(ctx context.Context, userID int64) ([]service.UserAuthIdentityRecord, error) {
-	panic("unexpected ListUserAuthIdentities call")
 }
 
 func (s *stubUserRepo) UnbindUserAuthProvider(context.Context, int64, string) error {

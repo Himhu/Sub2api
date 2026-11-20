@@ -330,9 +330,8 @@
                     </td>
                     <td class="whitespace-nowrap px-5 py-4 text-sm text-gray-700 dark:text-gray-300">
                       <div>{{ violationCountText(row) }}</div>
-                      <div class="text-xs text-gray-400">
-                        {{ row.email_sent ? t('admin.riskControl.emailSent') : t('admin.riskControl.emailNotSent') }}
-                        <span v-if="row.auto_banned"> / {{ t('admin.riskControl.autoBanned') }}</span>
+                      <div v-if="row.auto_banned" class="text-xs text-gray-400">
+                        {{ t('admin.riskControl.autoBanned') }}
                       </div>
                       <button
                         v-if="canUnbanRow(row)"
@@ -895,13 +894,6 @@
               </div>
               <div class="flex items-center justify-between rounded-lg border border-gray-100 p-4 dark:border-dark-700">
                 <div>
-                  <p class="text-sm font-medium text-gray-900 dark:text-white">{{ t('admin.riskControl.emailOnHit') }}</p>
-                  <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.riskControl.emailOnHitHint') }}</p>
-                </div>
-                <Toggle v-model="configForm.email_on_hit" />
-              </div>
-              <div class="flex items-center justify-between rounded-lg border border-gray-100 p-4 dark:border-dark-700">
-                <div>
                   <p class="text-sm font-medium text-gray-900 dark:text-white">{{ t('admin.riskControl.autoBan') }}</p>
                   <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ t('admin.riskControl.autoBanHint') }}</p>
                 </div>
@@ -1281,7 +1273,6 @@ const configForm = reactive({
   queue_size: 32768,
   block_status: 403,
   block_message: defaultBlockMessage(),
-  email_on_hit: true,
   auto_ban_enabled: true,
   cyber_policy_exclude_from_ban_count: false,
   ban_threshold: 10,
@@ -1808,7 +1799,6 @@ function applyConfig(config: ContentModerationConfig) {
   configForm.queue_size = config.queue_size || 32768
   configForm.block_status = config.block_status || 403
   configForm.block_message = config.block_message || defaultBlockMessage()
-  configForm.email_on_hit = config.email_on_hit ?? true
   configForm.auto_ban_enabled = config.auto_ban_enabled ?? true
   configForm.cyber_policy_exclude_from_ban_count = config.cyber_policy_exclude_from_ban_count ?? false
   configForm.ban_threshold = config.ban_threshold || 10
@@ -1902,7 +1892,6 @@ async function saveConfig() {
       queue_size: Number(configForm.queue_size) || 32768,
       block_status: Number(configForm.block_status) || 403,
       block_message: configForm.block_message || defaultBlockMessage(),
-      email_on_hit: configForm.email_on_hit,
       auto_ban_enabled: configForm.auto_ban_enabled,
       cyber_policy_exclude_from_ban_count: configForm.cyber_policy_exclude_from_ban_count,
       ban_threshold: Number(configForm.ban_threshold) || 10,

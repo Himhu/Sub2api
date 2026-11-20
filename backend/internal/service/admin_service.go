@@ -12,28 +12,6 @@ import (
 
 // AdminService interface defines admin management operations
 type AdminService interface {
-	// User management
-	ListUsers(ctx context.Context, page, pageSize int, filters UserListFilters, sortBy, sortOrder string) ([]User, int64, error)
-	GetUser(ctx context.Context, id int64) (*User, error)
-	GetUserIncludeDeleted(ctx context.Context, id int64) (*User, error)
-	CreateUser(ctx context.Context, input *CreateUserInput) (*User, error)
-	UpdateUser(ctx context.Context, id int64, input *UpdateUserInput) (*User, error)
-	DeleteUser(ctx context.Context, id int64) error
-	UpdateUserBalance(ctx context.Context, userID int64, balance float64, operation string, notes string) (*User, error)
-	BatchUpdateConcurrency(ctx context.Context, userIDs []int64, value int, mode string) (int, error)
-	BatchUpdateLimits(ctx context.Context, userIDs []int64, concurrency, rpmLimit *int) (int, error)
-	// FindActiveUsersByBlacklistedEmails 按收件箱身份查找命中给定邮箱的未禁用普通用户。
-	FindActiveUsersByBlacklistedEmails(ctx context.Context, emails []string) ([]User, error)
-	// BatchDisableUsers 批量禁用普通用户，返回实际禁用的人数。
-	BatchDisableUsers(ctx context.Context, userIDs []int64) (int, error)
-	GetUserAPIKeys(ctx context.Context, userID int64, page, pageSize int, sortBy, sortOrder string) ([]APIKey, int64, error)
-	GetUserUsageStats(ctx context.Context, userID int64, period string) (any, error)
-	GetUserRPMStatus(ctx context.Context, userID int64) (*UserRPMStatus, error)
-	// GetUserBalanceHistory returns paginated balance/concurrency change records for a user.
-	// codeType is optional - pass empty string to return all types.
-	// Also returns totalRecharged (sum of all positive balance top-ups).
-	GetUserBalanceHistory(ctx context.Context, userID int64, page, pageSize int, codeType string) ([]RedeemCode, int64, float64, error)
-	BindUserAuthIdentity(ctx context.Context, userID int64, input AdminBindAuthIdentityInput) (*AdminBoundAuthIdentity, error)
 
 	// Group management
 	ListGroups(ctx context.Context, page, pageSize int, platform, status, search string, isExclusive *bool, sortBy, sortOrder string) ([]Group, int64, error)
@@ -134,13 +112,6 @@ type AdminService interface {
 	TestProxy(ctx context.Context, id int64) (*ProxyTestResult, error)
 	CheckProxyQuality(ctx context.Context, id int64) (*ProxyQualityCheckResult, error)
 
-	// Redeem code management
-	ListRedeemCodes(ctx context.Context, page, pageSize int, codeType, status, search string, sortBy, sortOrder string) ([]RedeemCode, int64, error)
-	GetRedeemCode(ctx context.Context, id int64) (*RedeemCode, error)
-	GenerateRedeemCodes(ctx context.Context, input *GenerateRedeemCodesInput) ([]RedeemCode, error)
-	DeleteRedeemCode(ctx context.Context, id int64) error
-	BatchDeleteRedeemCodes(ctx context.Context, ids []int64) (int64, error)
-	ExpireRedeemCode(ctx context.Context, id int64) (*RedeemCode, error)
 	ResetAccountQuota(ctx context.Context, id int64) error
 }
 
@@ -196,44 +167,6 @@ type UpdateUserInput struct {
 	GroupRates map[int64]*float64
 	// ActorAdminID 执行本次操作的管理员ID(来自JWT)，仅用于权限敏感操作的审计日志。
 	ActorAdminID int64
-}
-
-type AdminBindAuthIdentityInput struct {
-	ProviderType    string
-	ProviderKey     string
-	ProviderSubject string
-	Issuer          *string
-	Metadata        map[string]any
-	Channel         *AdminBindAuthIdentityChannelInput
-}
-
-type AdminBindAuthIdentityChannelInput struct {
-	Channel        string
-	ChannelAppID   string
-	ChannelSubject string
-	Metadata       map[string]any
-}
-
-type AdminBoundAuthIdentity struct {
-	UserID          int64                          `json:"user_id"`
-	ProviderType    string                         `json:"provider_type"`
-	ProviderKey     string                         `json:"provider_key"`
-	ProviderSubject string                         `json:"provider_subject"`
-	VerifiedAt      *time.Time                     `json:"verified_at,omitempty"`
-	Issuer          *string                        `json:"issuer,omitempty"`
-	Metadata        map[string]any                 `json:"metadata"`
-	CreatedAt       time.Time                      `json:"created_at"`
-	UpdatedAt       time.Time                      `json:"updated_at"`
-	Channel         *AdminBoundAuthIdentityChannel `json:"channel,omitempty"`
-}
-
-type AdminBoundAuthIdentityChannel struct {
-	Channel        string         `json:"channel"`
-	ChannelAppID   string         `json:"channel_app_id"`
-	ChannelSubject string         `json:"channel_subject"`
-	Metadata       map[string]any `json:"metadata"`
-	CreatedAt      time.Time      `json:"created_at"`
-	UpdatedAt      time.Time      `json:"updated_at"`
 }
 
 type CreateGroupInput struct {
@@ -705,7 +638,6 @@ type adminServiceImpl struct {
 	accountBillingRepo   AccountBillingSettingsRepository
 	proxyRepo            ProxyRepository
 	apiKeyRepo           APIKeyRepository
-	redeemCodeRepo       RedeemCodeRepository
 	userGroupRateRepo    UserGroupRateRepository
 	userRPMCache         UserRPMCache
 	billingCacheService  *BillingCacheService
@@ -714,11 +646,8 @@ type adminServiceImpl struct {
 	authCacheInvalidator APIKeyAuthCacheInvalidator
 	entClient            *dbent.Client // 用于开启数据库事务
 	settingService       *SettingService
-	defaultSubAssigner   DefaultSubscriptionAssigner
-	userSubRepo          UserSubscriptionRepository
 	privacyClientFactory PrivacyClientFactory
 	runtimeBlocker       AccountRuntimeBlocker
-	affiliateService     adminRechargeAffiliateAccruer
 	compositeRouteRepo   CompositeModelRouteRepository
 	compositeResolver    *CompositeRouteResolver
 	// 分组平台变更后用来失效渠道缓存；可为 nil（缓存会在 TTL 到期后自然重建）
@@ -729,10 +658,6 @@ type adminServiceImpl struct {
 // 窄接口，避免 admin 服务依赖整个 ChannelService——与 APIKeyAuthCacheInvalidator 同一思路。
 type ChannelCacheInvalidator interface {
 	InvalidateCache()
-}
-
-type adminRechargeAffiliateAccruer interface {
-	AccrueInviteRebate(ctx context.Context, inviteeUserID int64, baseRechargeAmount float64) (float64, error)
 }
 
 type userGroupRateBatchReader interface {
@@ -747,7 +672,6 @@ func NewAdminService(
 	accountRepo AdminAccountRepository,
 	proxyRepo ProxyRepository,
 	apiKeyRepo APIKeyRepository,
-	redeemCodeRepo RedeemCodeRepository,
 	userGroupRateRepo UserGroupRateRepository,
 	userRPMCache UserRPMCache,
 	billingCacheService *BillingCacheService,
@@ -756,11 +680,8 @@ func NewAdminService(
 	authCacheInvalidator APIKeyAuthCacheInvalidator,
 	entClient *dbent.Client,
 	settingService *SettingService,
-	defaultSubAssigner DefaultSubscriptionAssigner,
-	userSubRepo UserSubscriptionRepository,
 	privacyClientFactory PrivacyClientFactory,
 	runtimeBlocker AccountRuntimeBlocker,
-	affiliateService *AffiliateService,
 	compositeRouteRepo CompositeModelRouteRepository,
 	compositeResolver *CompositeRouteResolver,
 	channelCacheInvalidator ChannelCacheInvalidator,
@@ -776,7 +697,6 @@ func NewAdminService(
 		accountBillingRepo:   accountRepo,
 		proxyRepo:            proxyRepo,
 		apiKeyRepo:           apiKeyRepo,
-		redeemCodeRepo:       redeemCodeRepo,
 		userGroupRateRepo:    userGroupRateRepo,
 		userRPMCache:         userRPMCache,
 		billingCacheService:  billingCacheService,
@@ -785,11 +705,8 @@ func NewAdminService(
 		authCacheInvalidator: authCacheInvalidator,
 		entClient:            entClient,
 		settingService:       settingService,
-		defaultSubAssigner:   defaultSubAssigner,
-		userSubRepo:          userSubRepo,
 		privacyClientFactory: privacyClientFactory,
 		runtimeBlocker:       runtimeBlocker,
-		affiliateService:     affiliateService,
 		compositeRouteRepo:   compositeRouteRepo,
 		compositeResolver:    compositeResolver,
 

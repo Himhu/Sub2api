@@ -29,11 +29,10 @@ func TestScopedAdminUsageListDoesNotGrantNestedResourceRead(t *testing.T) {
 	privateUser := &service.User{ID: 7, Email: "private-email@example.invalid", Balance: 97531, Notes: "private-user-notes"}
 	privateKey := &service.APIKey{ID: 8, Key: "private-api-key-secret", Name: "private-key-name", User: privateUser}
 	privateGroup := &service.Group{ID: 9, Name: "private-group-name", Description: "private-group-description", RateMultiplier: 7}
-	privateSub := &service.UserSubscription{ID: 10, User: privateUser, Group: privateGroup, DailyUsageUSD: 100}
 	privateAccount := &service.Account{ID: 11, Name: "private-account-name", Credentials: map[string]any{"access_token": "private-account-token"}}
 	for _, scoped := range []bool{true, false} {
 		t.Run(map[bool]string{true: "受限用量读取", false: "完整管理员保留响应"}[scoped], func(t *testing.T) {
-			repo := &scopedUsageResponseRepo{records: []service.UsageLog{{ID: 12, UserID: 7, APIKeyID: 8, AccountID: 11, RequestID: "request-public", RequestedModel: "requested-model", Model: "effective-model", InputTokens: 123, OutputTokens: 456, TotalCost: 1.25, ActualCost: 1, User: privateUser, APIKey: privateKey, Group: privateGroup, Subscription: privateSub, Account: privateAccount}}}
+			repo := &scopedUsageResponseRepo{records: []service.UsageLog{{ID: 12, UserID: 7, APIKeyID: 8, AccountID: 11, RequestID: "request-public", RequestedModel: "requested-model", Model: "effective-model", InputTokens: 123, OutputTokens: 456, TotalCost: 1.25, ActualCost: 1, User: privateUser, APIKey: privateKey, Group: privateGroup, Account: privateAccount}}}
 			h := NewUsageHandler(service.NewUsageService(repo, nil, nil, nil), nil, nil, nil)
 			r := gin.New()
 			r.Use(func(c *gin.Context) {

@@ -4,15 +4,12 @@ package repository
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
-	"github.com/Wei-Shaw/sub2api/ent/authidentity"
-	"github.com/Wei-Shaw/sub2api/ent/authidentitychannel"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/stretchr/testify/suite"
@@ -65,44 +62,6 @@ func (s *UserRepoSuite) mustCreateUser(u *service.User) *service.User {
 	return u
 }
 
-func (s *UserRepoSuite) TestCreateWithEmailAliasGuardAndDomainLimitConcurrent() {
-	domain := "race-" + strings.ToLower(strings.ReplaceAll(time.Now().Format("150405.000000000"), ".", "")) + ".example"
-	users := []*service.User{
-		{Email: "first@" + domain, PasswordHash: "hash", Role: service.RoleUser, Status: service.StatusActive},
-		{Email: "second@" + domain, PasswordHash: "hash", Role: service.RoleUser, Status: service.StatusActive},
-	}
-
-	errs := make(chan error, len(users))
-	var wg sync.WaitGroup
-	for _, user := range users {
-		wg.Add(1)
-		go func(user *service.User) {
-			defer wg.Done()
-			errs <- s.repo.CreateWithEmailAliasGuardAndDomainLimit(s.ctx, user, domain)
-		}(user)
-	}
-	wg.Wait()
-	close(errs)
-
-	var success, limited int
-	for err := range errs {
-		switch {
-		case err == nil:
-			success++
-		case errors.Is(err, service.ErrEmailDomainRegistrationLimit):
-			limited++
-		default:
-			s.Require().NoError(err)
-		}
-	}
-	s.Require().Equal(1, success)
-	s.Require().Equal(1, limited)
-
-	count, err := s.repo.CountUsersByEmailDomain(s.ctx, domain)
-	s.Require().NoError(err)
-	s.Require().Equal(1, count)
-}
-
 func (s *UserRepoSuite) mustCreateGroup(name string) *service.Group {
 	s.T().Helper()
 
@@ -113,30 +72,6 @@ func (s *UserRepoSuite) mustCreateGroup(name string) *service.Group {
 	s.Require().NoError(err, "create group")
 	return groupEntityToService(g)
 }
-
-func (s *UserRepoSuite) mustCreateSubscription(userID, groupID int64, mutate func(*dbent.UserSubscriptionCreate)) *dbent.UserSubscription {
-	s.T().Helper()
-
-	now := time.Now()
-	create := s.client.UserSubscription.Create().
-		SetUserID(userID).
-		SetGroupID(groupID).
-		SetStartsAt(now.Add(-1 * time.Hour)).
-		SetExpiresAt(now.Add(24 * time.Hour)).
-		SetStatus(service.SubscriptionStatusActive).
-		SetAssignedAt(now).
-		SetNotes("")
-
-	if mutate != nil {
-		mutate(create)
-	}
-
-	sub, err := create.Save(s.ctx)
-	s.Require().NoError(err, "create subscription")
-	return sub
-}
-
-// --- Create / GetByID / GetByEmail / Update / Delete ---
 
 func (s *UserRepoSuite) TestCreate() {
 	user := s.mustCreateUser(&service.User{
@@ -255,30 +190,6 @@ func (s *UserRepoSuite) TestBatchUpdateLimitsIgnoresDeletedUsersAndReturnsAffect
 	s.Equal(10, updatedDeleted.RPMLimit)
 }
 
-func (s *UserRepoSuite) TestUpdateIgnoresNoRowsFromConflictingEmailIdentityUpsert() {
-	user := s.mustCreateUser(&service.User{Email: "update-existing-identity@test.com", Username: "original"})
-
-	identityCount, err := s.client.AuthIdentity.Query().
-		Where(
-			authidentity.UserIDEQ(user.ID),
-			authidentity.ProviderTypeEQ("email"),
-			authidentity.ProviderKeyEQ("email"),
-			authidentity.ProviderSubjectEQ("update-existing-identity@test.com"),
-		).
-		Count(s.ctx)
-	s.Require().NoError(err)
-	s.Require().Equal(1, identityCount)
-
-	got, err := s.repo.GetByID(s.ctx, user.ID)
-	s.Require().NoError(err)
-	got.Username = "updated"
-	s.Require().NoError(s.repo.Update(s.ctx, got, service.UserUpdateFields{Username: true}), "Update should tolerate ON CONFLICT DO NOTHING returning no rows")
-
-	updated, err := s.repo.GetByID(s.ctx, user.ID)
-	s.Require().NoError(err)
-	s.Require().Equal("updated", updated.Username)
-}
-
 func (s *UserRepoSuite) TestDelete() {
 	user := s.mustCreateUser(&service.User{Email: "delete@test.com"})
 
@@ -288,41 +199,6 @@ func (s *UserRepoSuite) TestDelete() {
 	_, err = s.repo.GetByID(s.ctx, user.ID)
 	s.Require().Error(err, "expected error after delete")
 }
-
-func (s *UserRepoSuite) TestDeleteRemovesAuthIdentitiesAndChannels() {
-	user := s.mustCreateUser(&service.User{Email: "delete-oauth@test.com"})
-
-	identity, err := s.client.AuthIdentity.Create().
-		SetUserID(user.ID).
-		SetProviderType("linuxdo").
-		SetProviderKey("linuxdo").
-		SetProviderSubject("delete-oauth-subject").
-		Save(s.ctx)
-	s.Require().NoError(err)
-
-	_, err = s.client.AuthIdentityChannel.Create().
-		SetIdentityID(identity.ID).
-		SetProviderType("wechat").
-		SetProviderKey("wechat").
-		SetChannel("open").
-		SetChannelAppID("app-id").
-		SetChannelSubject("openid-123").
-		Save(s.ctx)
-	s.Require().NoError(err)
-
-	err = s.repo.Delete(s.ctx, user.ID)
-	s.Require().NoError(err)
-
-	identityCount, err := s.client.AuthIdentity.Query().Where(authidentity.UserIDEQ(user.ID)).Count(s.ctx)
-	s.Require().NoError(err)
-	s.Require().Zero(identityCount)
-
-	channelCount, err := s.client.AuthIdentityChannel.Query().Where(authidentitychannel.IdentityIDEQ(identity.ID)).Count(s.ctx)
-	s.Require().NoError(err)
-	s.Require().Zero(channelCount)
-}
-
-// --- List / ListWithFilters ---
 
 func (s *UserRepoSuite) TestList() {
 	s.mustCreateUser(&service.User{Email: "list1@test.com"})
@@ -372,28 +248,6 @@ func (s *UserRepoSuite) TestListWithFilters_SearchByUsername() {
 	s.Require().NoError(err)
 	s.Require().Len(users, 1)
 	s.Require().Equal("JohnDoe", users[0].Username)
-}
-
-func (s *UserRepoSuite) TestListWithFilters_LoadsActiveSubscriptions() {
-	user := s.mustCreateUser(&service.User{Email: "sub@test.com", Status: service.StatusActive})
-	groupActive := s.mustCreateGroup("g-sub-active")
-	groupExpired := s.mustCreateGroup("g-sub-expired")
-
-	_ = s.mustCreateSubscription(user.ID, groupActive.ID, func(c *dbent.UserSubscriptionCreate) {
-		c.SetStatus(service.SubscriptionStatusActive)
-		c.SetExpiresAt(time.Now().Add(1 * time.Hour))
-	})
-	_ = s.mustCreateSubscription(user.ID, groupExpired.ID, func(c *dbent.UserSubscriptionCreate) {
-		c.SetStatus(service.SubscriptionStatusExpired)
-		c.SetExpiresAt(time.Now().Add(-1 * time.Hour))
-	})
-
-	users, _, err := s.repo.ListWithFilters(s.ctx, pagination.PaginationParams{Page: 1, PageSize: 10}, service.UserListFilters{Search: "sub@"})
-	s.Require().NoError(err, "ListWithFilters")
-	s.Require().Len(users, 1, "expected 1 user")
-	s.Require().Len(users[0].Subscriptions, 1, "expected 1 active subscription")
-	s.Require().NotNil(users[0].Subscriptions[0].Group, "expected subscription group preload")
-	s.Require().Equal(groupActive.ID, users[0].Subscriptions[0].Group.ID, "group ID mismatch")
 }
 
 func (s *UserRepoSuite) TestListWithFilters_CombinedFilters() {

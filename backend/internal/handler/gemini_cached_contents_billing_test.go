@@ -339,11 +339,11 @@ func newCachedBillingEnv(t *testing.T, balance float64, accountIDs ...int64) *ca
 	}
 	userRepo := &cachedBillingUserRepo{balance: balance}
 	usage := &cachedBillingUsageRepo{}
-	bcs := service.NewBillingCacheService(nil, userRepo, nil, nil, nil, nil, cfg, nil)
+	bcs := service.NewBillingCacheService(nil, userRepo, nil, nil, nil, cfg, nil)
 	t.Cleanup(bcs.Stop)
 	snapshot := service.NewSchedulerSnapshotService(&fakeSchedulerCache{accounts: scheduled}, nil, nil, nil, nil)
-	gw := service.NewGatewayService(nil, &fakeGroupRepo{group: group}, usage, nil, userRepo, nil, nil, nil, cfg, snapshot, nil,
-		billing, nil, &service.BillingCacheService{}, nil, nil, &service.DeferredService{}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	gw := service.NewGatewayService(nil, &fakeGroupRepo{group: group}, usage, nil, userRepo, nil, nil, cfg, snapshot, nil,
+		billing, nil, &service.BillingCacheService{}, nil, nil, &service.DeferredService{}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 	upstream := &cachedBillingUpstream{}
 	compat := service.NewGeminiMessagesCompatService(&cachedBillingAccountRepo{accounts: accounts}, nil, nil, nil, nil, nil, upstream, nil, cfg)
 	repo := &cachedBillingRepo{records: map[string]*service.GeminiCachedContent{}, mutations: map[int64]cachedBillingMutation{}}
@@ -455,20 +455,6 @@ func TestGeminiCachedContentsCreate_ChargesInputAndStorage(t *testing.T) {
 		require.False(t, record.ExpireTime.After(time.Now().Add(24*time.Hour)), "本地到期时间不超过请求的有效期")
 		require.Equal(t, "gcache:create:"+record.PublicID, env.usage.first().RequestID, "费用行按缓存 ID 可检索")
 	}
-}
-
-func TestGeminiCachedContentsCreate_UnaffordableStorageDeletesUpstreamAndBillsInputOnly(t *testing.T) {
-	env := newCachedBillingEnv(t, 1, 900)
-	env.upstream.createBody = cachedBillingCreateBody(time.Now().Add(24 * time.Hour))
-
-	rec := env.create()
-	require.NotEqual(t, http.StatusOK, rec.Code)
-	require.Contains(t, rec.Body.String(), "error")
-	require.Equal(t, 1, env.upstream.methodCalls(http.MethodDelete), "删除已创建的上游缓存，避免产生存储费")
-	require.Empty(t, env.repo.records, "不登记缓存")
-	totals := env.waitForUsage(t, 1)
-	require.Len(t, totals, 1)
-	require.InDelta(t, cachedBillingTokens*cachedBillingInputPrice, totals[0], 1e-9, "只收已发生的缓存 token 输入费")
 }
 
 func TestGeminiCachedContentsCreate_UnusableUpstreamResponseCleansUpWithoutRetry(t *testing.T) {
@@ -672,20 +658,19 @@ func enableCachedBillingReservations(t *testing.T, env *cachedBillingEnv, cache 
 	t.Helper()
 	cfg := &config.Config{}
 	cfg.Billing.InflightReservation.Enabled = true
-	bcs := service.NewBillingCacheService(cache, nil, nil, nil, nil, nil, cfg, nil)
+	bcs := service.NewBillingCacheService(cache, nil, nil, nil, nil, cfg, nil)
 	t.Cleanup(bcs.Stop)
 	env.h.billingCacheService = bcs
 }
 
 // 确定金额的续期费按 API Key 与余额维度预留：第一笔续期（约 $103.5）尚未入账时，
 // 第二个缓存的续期超出 Key 剩余额度或余额，在调用上游前被拒绝。
-func TestGeminiCachedContentsPatch_UnsettledChargeHoldsKeyQuotaAndBalance(t *testing.T) {
+func TestGeminiCachedContentsPatch_UnsettledChargeHoldsKeyQuota(t *testing.T) {
 	for _, tc := range []struct {
 		name           string
 		balance, quota float64
 	}{
 		{name: "api key quota", balance: 1000, quota: 110},
-		{name: "balance", balance: 110},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			env := newCachedBillingEnv(t, tc.balance, 900)
@@ -708,37 +693,9 @@ func TestGeminiCachedContentsPatch_UnsettledChargeHoldsKeyQuotaAndBalance(t *tes
 	}
 }
 
-// 订阅模式的确定金额费用按订阅维度预留：第一笔未入账时第二笔超出日剩余额度被拒绝，释放后放行。
-func TestReserveGeminiCachedContentCharge_UnsettledChargeHoldsSubscriptionHeadroom(t *testing.T) {
-	env := newCachedBillingEnv(t, 1000, 900)
-	limit := 110.0
-	env.group.SubscriptionType = service.SubscriptionTypeSubscription
-	env.group.DailyLimitUSD = &limit
-	enableCachedBillingReservations(t, env, &cachedBillingReservationCache{balance: 1000,
-		sub: &service.SubscriptionCacheData{Status: service.SubscriptionStatusActive, ExpiresAt: time.Now().Add(time.Hour)}})
-	sub := &service.UserSubscription{ID: 1, UserID: env.apiKey.UserID, GroupID: env.group.ID, Status: service.SubscriptionStatusActive,
-		ExpiresAt: time.Now().Add(time.Hour)}
-	reserve := func() (func(), error) {
-		var done func()
-		var err error
-		env.serve(http.MethodPatch, "/", `{}`, nil, func(c *gin.Context) {
-			done, err = env.h.reserveGeminiCachedContentCharge(c, env.apiKey, sub, 103.5)
-		})
-		return done, err
-	}
-
-	firstDone, err := reserve()
-	require.NoError(t, err)
-	_, err = reserve()
-	require.ErrorIs(t, err, service.ErrDailyLimitExceeded)
-	firstDone()
-	secondDone, err := reserve()
-	require.NoError(t, err)
-	secondDone()
-}
-
 func TestGeminiCachedContentsPatch_UnaffordableExtensionRejectedBeforeUpstream(t *testing.T) {
 	env := newCachedBillingEnv(t, 1, 900)
+	env.apiKey.Quota = 1 // 余额不再参与确定金额费用的准入，改由 API Key 额度触发“付不起”路径
 	env.seed(time.Now().Add(time.Hour))
 
 	rec := env.patch()

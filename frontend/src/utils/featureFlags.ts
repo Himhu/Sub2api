@@ -99,16 +99,6 @@ export const FeatureFlags = {
     mode: 'opt-out',
     label: 'Channel Monitor',
   }),
-  availableChannels: defineFlag({
-    key: 'available_channels_enabled',
-    mode: 'opt-in',
-    label: 'Available Channels',
-  }),
-  subscription: defineFlag({
-    key: 'subscription_enabled',
-    mode: 'opt-out',
-    label: 'Subscription',
-  }),
   modelPlaza: defineFlag({
     key: 'model_plaza_enabled',
     mode: 'opt-in',
@@ -119,20 +109,10 @@ export const FeatureFlags = {
     mode: 'opt-in',
     label: 'Plugin Management',
   }),
-  payment: defineFlag({
-    key: 'payment_enabled',
-    mode: 'opt-out',
-    label: 'Payment',
-  }),
   riskControl: defineFlag({
     key: 'risk_control_enabled',
     mode: 'opt-in',
     label: 'Risk Control',
-  }),
-  affiliate: defineFlag({
-    key: 'affiliate_enabled',
-    mode: 'opt-in',
-    label: 'Affiliate',
   }),
   // Read-only: enabled by the deployment's MCP_PUBLIC_URL, not an admin toggle.
   mcp: defineFlag({

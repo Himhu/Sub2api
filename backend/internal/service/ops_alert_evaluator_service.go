@@ -32,10 +32,9 @@ return 0
 `)
 
 type OpsAlertEvaluatorService struct {
-	opsService   *OpsService
-	opsRepo      OpsRepository
-	emailService *EmailService
-	proxyRepo    ProxyRepository
+	opsService *OpsService
+	opsRepo    OpsRepository
+	proxyRepo  ProxyRepository
 
 	redisClient *redis.Client
 	cfg         *config.Config
@@ -65,7 +64,6 @@ type opsAlertRuleState struct {
 func NewOpsAlertEvaluatorService(
 	opsService *OpsService,
 	opsRepo OpsRepository,
-	emailService *EmailService,
 	redisClient *redis.Client,
 	cfg *config.Config,
 	proxyRepo ProxyRepository,
@@ -73,7 +71,6 @@ func NewOpsAlertEvaluatorService(
 	return &OpsAlertEvaluatorService{
 		opsService:   opsService,
 		opsRepo:      opsRepo,
-		emailService: emailService,
 		proxyRepo:    proxyRepo,
 		redisClient:  redisClient,
 		cfg:          cfg,
@@ -284,18 +281,12 @@ func (s *OpsAlertEvaluatorService) evaluateOnce(interval time.Duration) {
 				CreatedAt:      now,
 			}
 
-			created, err := s.opsRepo.CreateAlertEvent(ctx, firedEvent)
-			if err != nil {
+			if _, err := s.opsRepo.CreateAlertEvent(ctx, firedEvent); err != nil {
 				logger.LegacyPrintf("service.ops_alert_evaluator", "[OpsAlertEvaluator] create event failed (rule=%d): %v", rule.ID, err)
 				continue
 			}
 
 			eventsCreated++
-			if created != nil && created.ID > 0 {
-				if s.maybeSendAlertEmail(ctx, runtimeCfg, rule, created) {
-					emailsSent++
-				}
-			}
 			continue
 		}
 
@@ -673,118 +664,6 @@ func buildOpsAlertDescription(rule *OpsAlertRule, value float64, windowMinutes i
 		windowMinutes,
 		strings.TrimSpace(scope),
 	)
-}
-
-func (s *OpsAlertEvaluatorService) maybeSendAlertEmail(ctx context.Context, runtimeCfg *OpsAlertRuntimeSettings, rule *OpsAlertRule, event *OpsAlertEvent) bool {
-	if s == nil || s.emailService == nil || s.opsService == nil || event == nil || rule == nil {
-		return false
-	}
-	if event.EmailSent {
-		return false
-	}
-	if !rule.NotifyEmail {
-		return false
-	}
-
-	emailCfg, err := s.opsService.GetEmailNotificationConfig(ctx)
-	if err != nil || emailCfg == nil || !emailCfg.Alert.Enabled {
-		return false
-	}
-
-	if len(emailCfg.Alert.Recipients) == 0 {
-		return false
-	}
-	if !shouldSendOpsAlertEmailByMinSeverity(strings.TrimSpace(emailCfg.Alert.MinSeverity), strings.TrimSpace(rule.Severity)) {
-		return false
-	}
-
-	if runtimeCfg != nil && runtimeCfg.Silencing.Enabled {
-		if isOpsAlertSilenced(time.Now().UTC(), rule, event, runtimeCfg.Silencing) {
-			return false
-		}
-	}
-
-	// Apply/update rate limiter.
-	s.emailLimiter.SetLimit(emailCfg.Alert.RateLimitPerHour)
-
-	subject := fmt.Sprintf("[Ops Alert][%s] %s", strings.TrimSpace(rule.Severity), strings.TrimSpace(rule.Name))
-	body := buildOpsAlertEmailBody(rule, event)
-
-	anySent := false
-	for _, to := range emailCfg.Alert.Recipients {
-		addr := strings.TrimSpace(to)
-		if addr == "" {
-			continue
-		}
-		if !s.emailLimiter.Allow(time.Now().UTC()) {
-			continue
-		}
-		if s.emailService.notificationEmailService != nil {
-			if err := s.emailService.notificationEmailService.Send(ctx, NotificationEmailSendInput{
-				Event:          NotificationEmailEventOpsAlert,
-				RecipientEmail: addr,
-				RecipientName:  emailRecipientName(addr),
-				SourceType:     "ops_alert",
-				SourceID:       fmt.Sprintf("%d", event.ID),
-				Variables:      opsAlertEmailVariables(rule, event),
-			}); err == nil {
-				anySent = true
-				continue
-			} else if !shouldFallbackNotificationEmail(err) {
-				continue
-			}
-		}
-		if err := s.emailService.SendEmail(ctx, addr, subject, body); err != nil {
-			// Ignore per-recipient failures; continue best-effort.
-			continue
-		}
-		anySent = true
-	}
-
-	if anySent {
-		_ = s.opsRepo.UpdateAlertEventEmailSent(context.Background(), event.ID, true)
-	}
-	return anySent
-}
-
-func opsAlertEmailVariables(rule *OpsAlertRule, event *OpsAlertEvent) map[string]string {
-	variables := map[string]string{
-		"rule_name":         "-",
-		"severity":          "-",
-		"alert_status":      "-",
-		"metric_type":       "-",
-		"operator":          "-",
-		"metric_value":      "-",
-		"threshold_value":   "-",
-		"triggered_at":      time.Now().UTC().Format(time.RFC3339),
-		"alert_description": "-",
-	}
-	if rule != nil {
-		variables["rule_name"] = strings.TrimSpace(rule.Name)
-		variables["severity"] = strings.TrimSpace(rule.Severity)
-		variables["metric_type"] = strings.TrimSpace(rule.MetricType)
-		variables["operator"] = strings.TrimSpace(rule.Operator)
-		variables["threshold_value"] = fmt.Sprintf("%.2f", rule.Threshold)
-		if strings.TrimSpace(rule.Description) != "" {
-			variables["alert_description"] = strings.TrimSpace(rule.Description)
-		}
-	}
-	if event != nil {
-		variables["alert_status"] = strings.TrimSpace(event.Status)
-		if event.MetricValue != nil {
-			variables["metric_value"] = fmt.Sprintf("%.2f", *event.MetricValue)
-		}
-		if event.ThresholdValue != nil {
-			variables["threshold_value"] = fmt.Sprintf("%.2f", *event.ThresholdValue)
-		}
-		if !event.FiredAt.IsZero() {
-			variables["triggered_at"] = event.FiredAt.UTC().Format(time.RFC3339)
-		}
-		if strings.TrimSpace(event.Description) != "" {
-			variables["alert_description"] = strings.TrimSpace(event.Description)
-		}
-	}
-	return variables
 }
 
 func buildOpsAlertEmailBody(rule *OpsAlertRule, event *OpsAlertEvent) string {

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { enableAutoUnmount, flushPromises, mount } from '@vue/test-utils'
 import TotpSetupModal from '../TotpSetupModal.vue'
 
-const api = vi.hoisted(() => ({ getVerificationMethod: vi.fn(), initiateSetup: vi.fn(), enable: vi.fn() }))
+const api = vi.hoisted(() => ({ initiateSetup: vi.fn(), enable: vi.fn() }))
 vi.mock('@/api', () => ({ totpAPI: api }))
 vi.mock('@/stores/app', () => ({ useAppStore: () => ({ showError: vi.fn(), showSuccess: vi.fn() }) }))
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
@@ -11,7 +11,6 @@ enableAutoUnmount(afterEach)
 
 beforeEach(() => {
   vi.resetAllMocks()
-  api.getVerificationMethod.mockResolvedValue({ method: 'password' })
   api.initiateSetup.mockResolvedValue({ secret: 'EXAMPLE', qr_code_url: '', setup_token: 'setup-token' })
   api.enable.mockResolvedValue({ success: true })
 })

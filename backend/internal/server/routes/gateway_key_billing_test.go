@@ -73,15 +73,15 @@ func newKeyBillingRouteTestRouter(runMode string) (*gin.Engine, *keyBillingRoute
 	cfg := &config.Config{RunMode: runMode}
 	rateRepo := &keyBillingRouteRateRepo{}
 	apiKeyService := service.NewAPIKeyService(
-		&keyBillingRouteAPIKeyRepo{apiKey: apiKey}, nil, nil, nil, rateRepo, nil, cfg,
+		&keyBillingRouteAPIKeyRepo{apiKey: apiKey}, nil, nil, rateRepo, nil, cfg,
 	)
 	gatewayService := service.NewGatewayService(
-		nil, nil, nil, nil, nil, nil, rateRepo, nil, cfg, nil, nil, nil, nil, nil,
-		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, rateRepo, nil, cfg, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 	)
 	openAIGatewayService := service.NewOpenAIGatewayService(
-		nil, nil, nil, nil, nil, rateRepo, nil, cfg, nil, nil, nil,
-		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, rateRepo, nil, cfg, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 	)
 	gatewayHandler := handler.NewGatewayHandler(
 		gatewayService, openAIGatewayService, nil, nil, nil, nil, nil, nil,
@@ -95,9 +95,8 @@ func newKeyBillingRouteTestRouter(runMode string) (*gin.Engine, *keyBillingRoute
 	RegisterGatewayRoutes(
 		router,
 		&handler.Handlers{Gateway: gatewayHandler, OpenAIGateway: &handler.OpenAIGatewayHandler{}},
-		servermiddleware.NewAPIKeyAuthMiddleware(apiKeyService, nil, cfg),
+		servermiddleware.NewAPIKeyAuthMiddleware(apiKeyService, cfg),
 		apiKeyService,
-		nil,
 		nil,
 		nil,
 		nil,

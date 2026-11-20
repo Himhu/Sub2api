@@ -85,12 +85,12 @@ func TestGatewayCompatibilityHandlersReasoningEffortPolicy(t *testing.T) {
 						upstream := &compatEffortPolicyUpstream{}
 						usageRepo := &openAIWSUsageHandlerUsageLogRepoStub{created: make(chan *service.UsageLog, 1)}
 						billingRepo := &compatStreamUsageBillingRepo{}
-						billingCache := service.NewBillingCacheService(newHandlerInflightCache(100), nil, nil, nil, nil, nil, cfg, nil)
+						billingCache := service.NewBillingCacheService(newHandlerInflightCache(100), nil, nil, nil, nil, cfg, nil)
 						t.Cleanup(billingCache.Stop)
 						gateway := service.NewGatewayService(
-							nil, &fakeGroupRepo{group: group}, usageRepo, billingRepo, nil, nil, nil, nil, cfg,
+							nil, &fakeGroupRepo{group: group}, usageRepo, billingRepo, nil, nil, nil, cfg,
 							snapshot, nil, service.NewBillingService(cfg, nil), nil, nil, nil, upstream,
-							&service.DeferredService{}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+							&service.DeferredService{}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 						)
 						h := &GatewayHandler{
 							gatewayService: gateway, billingCacheService: billingCache, cfg: cfg, maxAccountSwitches: 1,

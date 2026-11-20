@@ -1596,49 +1596,6 @@ func (s *UsageLogRepoSuite) TestGetAccountUsageStats_EmptyRange() {
 	s.Require().Equal(int64(0), resp.Summary.TotalRequests)
 }
 
-// --- GetUserUsageTrend ---
-
-func (s *UsageLogRepoSuite) TestGetUserUsageTrend() {
-	user1 := mustCreateUser(s.T(), s.client, &service.User{Email: "usertrend1@test.com"})
-	user2 := mustCreateUser(s.T(), s.client, &service.User{Email: "usertrend2@test.com"})
-	apiKey1 := mustCreateApiKey(s.T(), s.client, &service.APIKey{UserID: user1.ID, Key: "sk-usertrend1", Name: "k1"})
-	apiKey2 := mustCreateApiKey(s.T(), s.client, &service.APIKey{UserID: user2.ID, Key: "sk-usertrend2", Name: "k2"})
-	account := mustCreateAccount(s.T(), s.client, &service.Account{Name: "acc-usertrends"})
-
-	base := time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC)
-	s.createUsageLog(user1, apiKey1, account, 100, 200, 1.0, base)
-	s.createUsageLog(user2, apiKey2, account, 50, 100, 0.5, base)
-	s.createUsageLog(user1, apiKey1, account, 100, 200, 1.0, base.Add(24*time.Hour))
-
-	startTime := base.Add(-1 * time.Hour)
-	endTime := base.Add(48 * time.Hour)
-
-	trend, err := s.repo.GetUserUsageTrend(s.ctx, startTime, endTime, "day", 10, "tokens")
-	s.Require().NoError(err, "GetUserUsageTrend")
-	s.Require().GreaterOrEqual(len(trend), 2)
-}
-
-func (s *UsageLogRepoSuite) TestGetUserUsageTrend_SelectsTopByMetric() {
-	highTokens := mustCreateUser(s.T(), s.client, &service.User{Email: "tokens@test.com"})
-	highSpend := mustCreateUser(s.T(), s.client, &service.User{Email: "spend@test.com"})
-	tokenKey := mustCreateApiKey(s.T(), s.client, &service.APIKey{UserID: highTokens.ID, Key: "sk-trend-tokens", Name: "tokens"})
-	spendKey := mustCreateApiKey(s.T(), s.client, &service.APIKey{UserID: highSpend.ID, Key: "sk-trend-spend", Name: "spend"})
-	account := mustCreateAccount(s.T(), s.client, &service.Account{Name: "acc-trend-metric"})
-	at := time.Date(2025, 1, 15, 12, 0, 0, 0, time.UTC)
-	s.createUsageLog(highTokens, tokenKey, account, 1000, 0, 0.1, at)
-	s.createUsageLog(highSpend, spendKey, account, 10, 0, 5, at)
-	start, end := at.Add(-time.Hour), at.Add(time.Hour)
-	tokens, err := s.repo.GetUserUsageTrend(s.ctx, start, end, "day", 1, "tokens")
-	s.Require().NoError(err)
-	s.Require().Len(tokens, 1)
-	s.Require().Equal(highTokens.ID, tokens[0].UserID)
-	spend, err := s.repo.GetUserUsageTrend(s.ctx, start, end, "day", 1, "actual_cost")
-	s.Require().NoError(err)
-	s.Require().Len(spend, 1)
-	s.Require().Equal(highSpend.ID, spend[0].UserID)
-	s.Require().Equal(5.0, spend[0].ActualCost)
-}
-
 // --- GetAPIKeyUsageTrend ---
 
 func (s *UsageLogRepoSuite) TestGetAPIKeyUsageTrend() {

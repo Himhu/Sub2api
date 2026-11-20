@@ -84,10 +84,6 @@ const sourceGroup: AdminGroup = {
   rpm_limit: 0,
   is_exclusive: false,
   status: 'active',
-  subscription_type: 'standard',
-  daily_limit_usd: null,
-  weekly_limit_usd: null,
-  monthly_limit_usd: null,
   allow_image_generation: false,
   allow_batch_image_generation: false,
   image_rate_independent: false,
@@ -103,10 +99,6 @@ const sourceGroup: AdminGroup = {
   video_price_720p: null,
   video_price_1080p: null,
   web_search_price_per_call: null,
-  peak_rate_enabled: false,
-  peak_start: '',
-  peak_end: '',
-  peak_rate_multiplier: 1,
   claude_code_only: false,
   fallback_group_id: null,
   fallback_group_id_on_invalid_request: null,
@@ -167,8 +159,6 @@ function mountView() {
         PlatformIcon: true,
         Icon: true,
         GroupCapacityBadge: true,
-        GroupRateMultipliersModal: true,
-        GroupRPMOverridesModal: true,
         VueDraggable: true
       }
     }

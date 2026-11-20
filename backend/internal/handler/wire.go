@@ -12,10 +12,8 @@ import (
 // ProvideAdminHandlers creates the AdminHandlers struct
 func ProvideAdminHandlers(
 	dashboardHandler *admin.DashboardHandler,
-	userHandler *admin.UserHandler,
 	groupHandler *admin.GroupHandler,
 	accountHandler *admin.AccountHandler,
-	announcementHandler *admin.AnnouncementHandler,
 	dataManagementHandler *admin.DataManagementHandler,
 	backupHandler *admin.BackupHandler,
 	oauthHandler *admin.OAuthHandler,
@@ -25,14 +23,9 @@ func ProvideAdminHandlers(
 	grokOAuthHandler *admin.GrokOAuthHandler,
 	cnProviderHandler *admin.CNProviderHandler,
 	proxyHandler *admin.ProxyHandler,
-	redeemHandler *admin.RedeemHandler,
-	promoHandler *admin.PromoHandler,
 	settingHandler *admin.SettingHandler,
 	opsHandler *admin.OpsHandler,
-	systemHandler *admin.SystemHandler,
-	subscriptionHandler *admin.SubscriptionHandler,
 	usageHandler *admin.UsageHandler,
-	userAttributeHandler *admin.UserAttributeHandler,
 	errorPassthroughHandler *admin.ErrorPassthroughHandler,
 	tlsFingerprintProfileHandler *admin.TLSFingerprintProfileHandler,
 	pluginHandler *admin.PluginHandler,
@@ -43,8 +36,6 @@ func ProvideAdminHandlers(
 	channelMonitorTemplateHandler *admin.ChannelMonitorRequestTemplateHandler,
 	contentModerationHandler *admin.ContentModerationHandler,
 	promptAuditHandler *securityaudit.PromptAdminHandler,
-	paymentHandler *admin.PaymentHandler,
-	affiliateHandler *admin.AffiliateHandler,
 	complianceHandler *admin.ComplianceHandler,
 	auditLogHandler *admin.AuditLogHandler,
 	upstreamBillingProbe *service.UpstreamBillingProbeService,
@@ -58,10 +49,8 @@ func ProvideAdminHandlers(
 	accountHandler.SetClaudeResetCreditService(claudeResetCredits)
 	return &AdminHandlers{
 		Dashboard:              dashboardHandler,
-		User:                   userHandler,
 		Group:                  groupHandler,
 		Account:                accountHandler,
-		Announcement:           announcementHandler,
 		DataManagement:         dataManagementHandler,
 		Backup:                 backupHandler,
 		OAuth:                  oauthHandler,
@@ -71,14 +60,9 @@ func ProvideAdminHandlers(
 		GrokOAuth:              grokOAuthHandler,
 		CNProvider:             cnProviderHandler,
 		Proxy:                  proxyHandler,
-		Redeem:                 redeemHandler,
-		Promo:                  promoHandler,
 		Setting:                settingHandler,
 		Ops:                    opsHandler,
-		System:                 systemHandler,
-		Subscription:           subscriptionHandler,
 		Usage:                  usageHandler,
-		UserAttribute:          userAttributeHandler,
 		ErrorPassthrough:       errorPassthroughHandler,
 		TLSFingerprintProfile:  tlsFingerprintProfileHandler,
 		Plugin:                 pluginHandler,
@@ -89,8 +73,6 @@ func ProvideAdminHandlers(
 		ChannelMonitorTemplate: channelMonitorTemplateHandler,
 		ContentModeration:      contentModerationHandler,
 		PromptAudit:            promptAuditHandler,
-		Payment:                paymentHandler,
-		Affiliate:              affiliateHandler,
 		Compliance:             complianceHandler,
 		AuditLog:               auditLogHandler,
 	}
@@ -158,22 +140,15 @@ func ProvideBatchImageHandler(
 	return h
 }
 
-// ProvideSystemHandler creates admin.SystemHandler with UpdateService
-func ProvideSystemHandler(updateService *service.UpdateService, lockService *service.SystemOperationLockService) *admin.SystemHandler {
-	return admin.NewSystemHandler(updateService, lockService)
-}
-
 // ProvideSettingHandler creates SettingHandler with version from BuildInfo
-func ProvideSettingHandler(settingService *service.SettingService, buildInfo BuildInfo, notificationEmailService *service.NotificationEmailService) *SettingHandler {
+func ProvideSettingHandler(settingService *service.SettingService, buildInfo BuildInfo) *SettingHandler {
 	h := NewSettingHandler(settingService, buildInfo.Version)
-	h.SetNotificationEmailService(notificationEmailService)
 	return h
 }
 
-// ProvideAdminSettingHandler creates admin.SettingHandler with notification template APIs.
-func ProvideAdminSettingHandler(settingService *service.SettingService, emailService *service.EmailService, turnstileService *service.TurnstileService, aliyunCaptchaService *service.AliyunCaptchaService, opsService *service.OpsService, paymentConfigService *service.PaymentConfigService, paymentService *service.PaymentService, userAttributeService *service.UserAttributeService, notificationEmailService *service.NotificationEmailService, totpService *service.TotpService, userService *service.UserService) *admin.SettingHandler {
-	h := admin.NewSettingHandler(settingService, emailService, turnstileService, opsService, paymentConfigService, paymentService, userAttributeService)
-	h.SetNotificationEmailService(notificationEmailService)
+// ProvideAdminSettingHandler creates admin.SettingHandler.
+func ProvideAdminSettingHandler(settingService *service.SettingService, turnstileService *service.TurnstileService, aliyunCaptchaService *service.AliyunCaptchaService, opsService *service.OpsService, totpService *service.TotpService, userService *service.UserService) *admin.SettingHandler {
+	h := admin.NewSettingHandler(settingService, turnstileService, opsService)
 	h.SetAliyunCaptchaService(aliyunCaptchaService)
 	h.SetStepUpDeps(totpService, userService)
 	return h
@@ -186,9 +161,6 @@ func ProvideHandlers(
 	mcpOAuthHandler *MCPOAuthHandler,
 	apiKeyHandler *APIKeyHandler,
 	usageHandler *UsageHandler,
-	redeemHandler *RedeemHandler,
-	subscriptionHandler *SubscriptionHandler,
-	announcementHandler *AnnouncementHandler,
 	channelMonitorUserHandler *ChannelMonitorUserHandler,
 	channelMonitorV2Handler *ChannelMonitorV2Handler,
 	adminHandlers *AdminHandlers,
@@ -197,8 +169,6 @@ func ProvideHandlers(
 	settingHandler *SettingHandler,
 	totpHandler *TotpHandler,
 	passkeyHandler *PasskeyHandler,
-	paymentHandler *PaymentHandler,
-	paymentWebhookHandler *PaymentWebhookHandler,
 	availableChannelHandler *AvailableChannelHandler,
 	modelPlazaHandler *ModelPlazaHandler,
 	asyncImageHandler *AsyncImageHandler,
@@ -213,9 +183,6 @@ func ProvideHandlers(
 		MCPOAuth:         mcpOAuthHandler,
 		APIKey:           apiKeyHandler,
 		Usage:            usageHandler,
-		Redeem:           redeemHandler,
-		Subscription:     subscriptionHandler,
-		Announcement:     announcementHandler,
 		ChannelMonitor:   channelMonitorUserHandler,
 		ChannelMonitorV2: channelMonitorV2Handler,
 		Admin:            adminHandlers,
@@ -224,8 +191,6 @@ func ProvideHandlers(
 		Setting:          settingHandler,
 		Totp:             totpHandler,
 		Passkey:          passkeyHandler,
-		Payment:          paymentHandler,
-		PaymentWebhook:   paymentWebhookHandler,
 		AvailableChannel: availableChannelHandler,
 		ModelPlaza:       modelPlazaHandler,
 		AsyncImage:       asyncImageHandler,
@@ -241,9 +206,6 @@ var ProviderSet = wire.NewSet(
 	NewMCPOAuthHandler,
 	NewAPIKeyHandler,
 	NewUsageHandler,
-	NewRedeemHandler,
-	NewSubscriptionHandler,
-	NewAnnouncementHandler,
 	NewChannelMonitorUserHandler,
 	NewChannelMonitorV2Handler,
 	ProvideGatewayHandler,
@@ -251,8 +213,6 @@ var ProviderSet = wire.NewSet(
 	NewTotpHandler,
 	NewPasskeyHandler,
 	ProvideSettingHandler,
-	NewPaymentHandler,
-	NewPaymentWebhookHandler,
 	NewAvailableChannelHandler,
 	NewModelPlazaHandler,
 	NewAsyncImageHandler,
@@ -260,10 +220,8 @@ var ProviderSet = wire.NewSet(
 
 	// Admin handlers
 	admin.NewDashboardHandler,
-	admin.NewUserHandler,
 	admin.NewGroupHandlerWithConfig,
 	admin.ProvideAccountHandler,
-	admin.NewAnnouncementHandler,
 	admin.NewDataManagementHandler,
 	admin.NewBackupHandler,
 	admin.NewOAuthHandler,
@@ -273,14 +231,9 @@ var ProviderSet = wire.NewSet(
 	admin.NewGrokOAuthHandler,
 	admin.NewCNProviderHandler,
 	admin.NewProxyHandler,
-	admin.NewRedeemHandler,
-	admin.NewPromoHandler,
 	ProvideAdminSettingHandler,
 	admin.NewOpsHandler,
-	ProvideSystemHandler,
-	admin.NewSubscriptionHandler,
 	admin.NewUsageHandler,
-	admin.NewUserAttributeHandler,
 	admin.NewErrorPassthroughHandler,
 	admin.NewTLSFingerprintProfileHandler,
 	admin.NewPluginHandler,
@@ -290,8 +243,6 @@ var ProviderSet = wire.NewSet(
 	admin.NewChannelMonitorHandler,
 	admin.NewChannelMonitorRequestTemplateHandler,
 	admin.NewContentModerationHandler,
-	admin.NewPaymentHandler,
-	admin.NewAffiliateHandler,
 	admin.NewComplianceHandler,
 	admin.NewAuditLogHandler,
 

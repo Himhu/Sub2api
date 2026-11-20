@@ -95,23 +95,8 @@ func ToolCatalog() []ToolSpec {
 		catalogTool("user_list_usage", "List your request usage, tokens and costs with pagination and optional date, model and key filters.", "GET", "/usage", catalogPage(catalogUsageFields(false)), nil),
 		catalogTool("user_get_usage_stats", "Get aggregate request counts, token usage and costs for your account; defaults to the last seven days. Dates are inclusive YYYY-MM-DD.", "GET", "/usage/stats", catalogObject(catalogUsageFields(false)), nil),
 		catalogTool("user_get_dashboard", "Get your dashboard totals, request counts and spending summary.", "GET", "/usage/dashboard/stats", nil, nil),
-		catalogTool("user_list_subscriptions", "List your subscriptions, associated groups, validity and current usage.", "GET", "/subscriptions", nil, nil),
-		catalogTool("user_get_subscription_summary", "Get a summary of your active subscription limits and remaining allowance.", "GET", "/subscriptions/summary", nil, nil),
 
 		catalogTool("admin_get_dashboard", "Get platform-wide user/account counts, usage, spending and service uptime.", "GET", "/admin/dashboard/stats", nil, nil),
-		catalogTool("admin_list_users", "List platform users and account limits with pagination. May include contact information and administrator notes.", "GET", "/admin/users", catalogPage(map[string]any{
-			"search":     catalogText("Search email or display name", 100),
-			"status":     catalogEnum("User status", "active", "disabled"),
-			"role":       catalogEnum("User role", "admin", "user"),
-			"group_name": catalogText("Search allowed group name", 100),
-		}), nil),
-		catalogTool("admin_get_user", "Get a platform user's profile, balance and limits by ID. Existing API key secrets are omitted.", "GET", "/admin/users/:id", nil, nil),
-		catalogTool("admin_update_user", "Update a user's display name, notes, limits, status or group access. Does not change passwords, roles or identity bindings. Returns the updated user.", "PUT", "/admin/users/:id", nil, userUpdate),
-		catalogTool("admin_update_user_balance", "Set, add to or subtract from a user's balance in USD. This changes real billing credit; verify the user, amount and operation before calling. Returns the updated result.", "POST", "/admin/users/:id/balance", nil, catalogObject(map[string]any{
-			"balance":   map[string]any{"type": "number", "exclusiveMinimum": 0, "description": "Positive amount in USD"},
-			"operation": catalogEnum("How to apply the amount", "set", "add", "subtract"),
-			"notes":     catalogText("Reason for the balance adjustment", 2000),
-		}, "balance", "operation", "notes")),
 		catalogTool("admin_list_groups", "List platform groups, pricing multipliers and status with pagination.", "GET", "/admin/groups", catalogPage(map[string]any{
 			"search": catalogText("Search group name", 100), "platform": catalogText("Platform identifier", 64),
 			"status": catalogEnum("Group status", "active", "inactive"), "is_exclusive": catalogBool("Filter exclusive groups"),
@@ -119,7 +104,7 @@ func ToolCatalog() []ToolSpec {
 		catalogTool("admin_get_group", "Get one group's configuration and model allowlist by ID.", "GET", "/admin/groups/:id", nil, nil),
 		catalogTool("admin_create_group", "Create a platform group with explicit platform and price multiplier. Returns the group; attach upstream accounts in the web console before serving traffic.", "POST", "/admin/groups", nil, groupCreate),
 		catalogTool("admin_update_group", "Update group name, pricing, spending limits, availability or model allowlist. Changes affect every user of this group. Only supplied fields change.", "PUT", "/admin/groups/:id", nil, groupUpdate),
-		catalogTool("admin_delete_group", "Delete a platform group. This can disrupt API keys and subscriptions associated with it. Returns the deletion result or a dependency error.", "DELETE", "/admin/groups/:id", nil, nil),
+		catalogTool("admin_delete_group", "Delete a platform group. This can disrupt API keys associated with it. Returns the deletion result or a dependency error.", "DELETE", "/admin/groups/:id", nil, nil),
 		catalogTool("admin_list_accounts", "List upstream account metadata, status and scheduling settings with pagination. Credentials are omitted.", "GET", "/admin/accounts", catalogPage(map[string]any{
 			"search": catalogText("Search account name", 100), "platform": catalogText("Platform identifier", 64),
 			"status": catalogEnum("Account status", "active", "inactive", "error", "rate_limited", "temp_unschedulable", "unschedulable"),
@@ -134,19 +119,6 @@ func ToolCatalog() []ToolSpec {
 		catalogTool("admin_clear_account_error", "Clear an upstream account's error state so it can recover. Investigate and fix the cause first. Returns the recovery result.", "POST", "/admin/accounts/:id/clear-error", nil, nil),
 		catalogTool("admin_list_usage", "List platform-wide request usage, tokens and costs with pagination. Filter by user, account, group, model or inclusive date range.", "GET", "/admin/usage", catalogPage(catalogUsageFields(true)), nil),
 		catalogTool("admin_get_usage_stats", "Get platform-wide aggregate usage and costs; defaults to today. Both start_date and end_date should be supplied for a custom range.", "GET", "/admin/usage/stats", catalogObject(catalogUsageFields(true)), nil),
-		catalogTool("admin_list_subscriptions", "List platform subscriptions and their user/group associations, expiry and quota usage with pagination.", "GET", "/admin/subscriptions", catalogPage(map[string]any{
-			"user_id": catalogID("User ID"), "group_id": catalogID("Group ID"),
-			"status": catalogEnum("Subscription status", "active", "expired", "revoked"), "platform": catalogText("Platform identifier", 64),
-		}), nil),
-		catalogTool("admin_get_subscription", "Get one platform subscription and its user/group association by ID.", "GET", "/admin/subscriptions/:id", nil, nil),
-		catalogTool("admin_assign_subscription", "Assign a subscription group to a user for the specified number of days. An existing subscription may be extended; do not retry blindly. Returns the resulting subscription.", "POST", "/admin/subscriptions/assign", nil, catalogObject(map[string]any{
-			"user_id": catalogID("Recipient user ID"), "group_id": catalogID("Subscription group ID"),
-			"validity_days": catalogInteger("Validity in days", 1, 36500), "notes": catalogText("Assignment notes", 2000),
-		}, "user_id", "group_id", "validity_days")),
-		catalogTool("admin_extend_subscription", "Extend a subscription by the specified positive number of days. Changes billing entitlement; returns the updated subscription.", "POST", "/admin/subscriptions/:id/extend", nil, catalogObject(map[string]any{
-			"days": catalogInteger("Additional validity in days", 1, 36500),
-		}, "days")),
-		catalogTool("admin_revoke_subscription", "Revoke a subscription immediately. The user loses the associated entitlement. Returns the revocation result.", "POST", "/admin/subscriptions/:id/revoke", nil, nil),
 		catalogTool("admin_get_ops_overview", "Get platform operational health, traffic, latency and error overview for troubleshooting.", "GET", "/admin/ops/dashboard/overview", nil, nil),
 	}
 	for i := range tools {
@@ -179,7 +151,7 @@ func catalogTool(name, description, method, path string, query, body map[string]
 	// These existing routes require an idempotency key. Keep retries within
 	// their established coordinator rather than inventing MCP-side settlement.
 	switch name {
-	case "user_create_api_key", "admin_update_user_balance", "admin_extend_subscription":
+	case "user_create_api_key":
 		properties["idempotency_key"] = map[string]any{
 			"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[!-~]+$",
 			"description": "Unique operation ID (for example a UUID). Reuse the same value and arguments when retrying this operation; use a new value for a new intended operation.",
@@ -265,13 +237,9 @@ func catalogUsageFields(admin bool) map[string]any {
 func catalogGroupFields() map[string]any {
 	return map[string]any{
 		"name": catalogNonemptyText("Group name", 100), "description": catalogText("Group description", 2000),
-		"rate_multiplier":   map[string]any{"type": "number", "exclusiveMinimum": 0, "description": "Positive user billing multiplier; 1 is standard pricing"},
-		"is_exclusive":      catalogBool("Limit access to users explicitly assigned this group"),
-		"subscription_type": catalogEnum("Group billing mode", "standard", "subscription"),
-		"daily_limit_usd":   catalogNumber("Daily subscription spending limit in USD; -1 means unlimited", -1),
-		"weekly_limit_usd":  catalogNumber("Weekly subscription spending limit in USD; -1 means unlimited", -1),
-		"monthly_limit_usd": catalogNumber("Monthly subscription spending limit in USD; -1 means unlimited", -1),
-		"rpm_limit":         catalogInteger("Requests per minute; 0 means unlimited", 0, 1000000),
+		"rate_multiplier": map[string]any{"type": "number", "exclusiveMinimum": 0, "description": "Positive user billing multiplier; 1 is standard pricing"},
+		"is_exclusive":    catalogBool("Limit access to users explicitly assigned this group"),
+		"rpm_limit":       catalogInteger("Requests per minute; 0 means unlimited", 0, 1000000),
 		"model_allowlist": catalogObject(map[string]any{
 			"enabled": catalogBool("Enable the model allowlist; an enabled list must contain at least one model"),
 			"models":  catalogStrings("Allowed upstream model IDs or patterns containing *", 1000, 200),

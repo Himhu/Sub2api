@@ -39,7 +39,6 @@ export interface ContentModerationConfig {
   queue_size: number
   block_status: number
   block_message: string
-  email_on_hit: boolean
   auto_ban_enabled: boolean
   ban_threshold: number
   violation_window_hours: number
@@ -124,7 +123,6 @@ export interface UpdateContentModerationConfig {
   queue_size?: number
   block_status?: number
   block_message?: string
-  email_on_hit?: boolean
   auto_ban_enabled?: boolean
   ban_threshold?: number
   violation_window_hours?: number
@@ -211,7 +209,6 @@ export interface ContentModerationLog {
   error: string
   violation_count: number
   auto_banned: boolean
-  email_sent: boolean
   user_status: string
   queue_delay_ms: number | null
   created_at: string

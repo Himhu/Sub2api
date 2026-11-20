@@ -139,11 +139,11 @@ func TestGatewayMessagesStickyWritebackAfterForward(t *testing.T) {
 				other.Schedulable = false
 				snapshot := service.NewSchedulerSnapshotService(&fakeSchedulerCache{accounts: []*service.Account{account, &other}}, nil, nil, nil, nil)
 				gw := service.NewGatewayService(
-					nil, &fakeGroupRepo{group: group}, nil, nil, nil, nil, nil, cache, cfg,
+					nil, &fakeGroupRepo{group: group}, nil, nil, nil, nil, cache, cfg,
 					snapshot, nil, service.NewBillingService(cfg, nil), nil, nil, nil, upstream,
-					&service.DeferredService{}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
+					&service.DeferredService{}, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil,
 				)
-				billingCache := service.NewBillingCacheService(nil, nil, nil, nil, nil, nil, cfg, nil)
+				billingCache := service.NewBillingCacheService(nil, nil, nil, nil, nil, cfg, nil)
 				t.Cleanup(billingCache.Stop)
 				h := &GatewayHandler{
 					gatewayService: gw, billingCacheService: billingCache, cfg: cfg, maxAccountSwitches: 1,

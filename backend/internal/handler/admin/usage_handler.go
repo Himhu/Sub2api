@@ -384,41 +384,6 @@ func (h *UsageHandler) Stats(c *gin.Context) {
 	response.Success(c, stats)
 }
 
-// SearchUsers handles searching users by email keyword
-// GET /api/v1/admin/usage/search-users
-func (h *UsageHandler) SearchUsers(c *gin.Context) {
-	keyword := c.Query("q")
-	if keyword == "" {
-		response.Success(c, []any{})
-		return
-	}
-
-	// Limit to 30 results
-	users, _, err := h.adminService.ListUsers(c.Request.Context(), 1, 30, service.UserListFilters{Search: keyword, IncludeDeleted: true}, "email", "asc")
-	if err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-
-	// Return simplified user list (only id, email and deleted flag)
-	type SimpleUser struct {
-		ID      int64  `json:"id"`
-		Email   string `json:"email"`
-		Deleted bool   `json:"deleted"`
-	}
-
-	result := make([]SimpleUser, len(users))
-	for i, u := range users {
-		result[i] = SimpleUser{
-			ID:      u.ID,
-			Email:   u.Email,
-			Deleted: u.DeletedAt != nil,
-		}
-	}
-
-	response.Success(c, result)
-}
-
 // SearchAPIKeys handles searching API keys by user
 // GET /api/v1/admin/usage/search-api-keys
 func (h *UsageHandler) SearchAPIKeys(c *gin.Context) {

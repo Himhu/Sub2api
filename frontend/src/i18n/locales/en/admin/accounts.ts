@@ -495,12 +495,6 @@ export default {
       },
       quotaLimitAmount: 'Total Limit',
       quotaLimitAmountHint: 'Cumulative spending limit. Does not auto-reset.',
-      quotaNotify: {
-        alert: 'Alert',
-        enabled: 'Enable Alert',
-        threshold: 'Alert Amount',
-        thresholdPlaceholder: 'Enter percentage',
-      },
       testConnection: 'Test Connection',
       reAuthorize: 'Re-Authorize',
       refreshToken: 'Refresh Token',

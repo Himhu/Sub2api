@@ -63,21 +63,32 @@ describe('AppSidebar header styles', () => {
   })
 })
 
-describe('AppSidebar subscription feature flag', () => {
-  it('gates the My Subscriptions entry behind the subscription public-settings flag', () => {
-    expect(componentSource).toContain('const flagSubscription = makeSidebarFlag(FeatureFlags.subscription)')
-    expect(componentSource).toMatch(/path: '\/subscriptions'[^\n]*featureFlag: flagSubscription/)
+describe('AppSidebar single-admin menu', () => {
+  it('renders one navigation list without user-only or SaaS entries', () => {
+    expect(componentSource).toContain('const navItems = computed((): NavItem[] =>')
+    expect(componentSource).not.toContain('userNavItems')
+    expect(componentSource).not.toContain('personalNavItems')
+    for (const path of [
+      '/admin/users',
+      '/admin/subscriptions',
+      '/admin/redeem',
+      '/admin/promo-codes',
+      '/admin/orders',
+      '/admin/affiliates',
+      '/admin/announcements',
+      '/purchase',
+      '/subscriptions',
+      '/redeem',
+      '/affiliate'
+    ]) {
+      expect(componentSource).not.toContain(`path: '${path}'`)
+    }
   })
 
-  it('also hides the admin Subscription Management entry on recharge-only sites', () => {
-    expect(componentSource).toMatch(/path: '\/admin\/subscriptions'[^\n]*featureFlag: flagSubscription/)
-  })
-
-  it('derives the purchase entry label from the site billing mode', () => {
-    expect(componentSource).toContain("import { resolveSiteBillingMode } from '@/utils/siteBillingMode'")
-    expect(componentSource).toMatch(/case 'recharge_only':\s*return t\('nav\.recharge'\)/)
-    expect(componentSource).toMatch(/case 'subscription_only':\s*return t\('nav\.subscribe'\)/)
-    expect(componentSource).toMatch(/path: '\/purchase'[^\n]*label: purchaseNavLabel\.value/)
+  it('keeps the API keys, profile and settings entries for the admin', () => {
+    expect(componentSource).toMatch(/path: '\/keys'[^\n]*icon: KeyIcon/)
+    expect(componentSource).toMatch(/path: '\/profile'[^\n]*icon: UserIcon/)
+    expect(componentSource).toMatch(/path: '\/admin\/settings'[^\n]*icon: CogIcon/)
   })
 })
 
@@ -86,7 +97,7 @@ describe('AppSidebar MCP entry', () => {
     expect(componentSource).toContain("render: () => h(Icon, { name: 'mcp' })")
     expect(componentSource).toContain('const flagMCP = makeSidebarFlag(FeatureFlags.mcp)')
     expect(componentSource).toMatch(/path: '\/settings\/mcp'[^\n]*icon: MCPIcon, featureFlag: flagMCP/)
-    expect(componentSource).toMatch(/if \(flagMCP\(\)\) filtered\.push\(\{ path: '\/settings\/mcp'[^\n]*icon: MCPIcon/)
+    expect(componentSource).not.toMatch(/path: '\/settings\/mcp'[^\n]*hideInSimpleMode/)
     expect(componentSource).not.toMatch(/path: '\/settings\/mcp'[^\n]*PluginIcon/)
   })
 })

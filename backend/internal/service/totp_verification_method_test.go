@@ -49,33 +49,11 @@ func newTotpVMService(t *testing.T, user *User, emailVerifyEnabled bool) (*TotpS
 	userRepo := &totpVMUserRepoStub{user: user}
 	values := map[string]string{}
 	if emailVerifyEnabled {
-		values[SettingKeyEmailVerifyEnabled] = "true"
+		// 历史上的 email_verify_enabled 开关；自托管裁剪后该设置不再影响 TOTP 身份校验方式。
+		values["email_verify_enabled"] = "true"
 	}
 	settingSvc := NewSettingService(&totpVMSettingRepoStub{values: values}, nil)
-	return NewTotpService(userRepo, nil, nil, settingSvc, nil, nil), userRepo
-}
-
-func TestGetVerificationMethodAdminAlwaysPassword(t *testing.T) {
-	admin := &User{ID: 1, Email: "admin@example.com", Role: RoleAdmin}
-	svc, _ := newTotpVMService(t, admin, true)
-
-	method, err := svc.GetVerificationMethod(context.Background(), admin.ID)
-	require.NoError(t, err)
-	require.Equal(t, "password", method.Method)
-}
-
-func TestGetVerificationMethodRegularUserFollowsEmailVerifySetting(t *testing.T) {
-	user := &User{ID: 2, Email: "user@example.com", Role: RoleUser}
-
-	svcEmailOn, _ := newTotpVMService(t, user, true)
-	method, err := svcEmailOn.GetVerificationMethod(context.Background(), user.ID)
-	require.NoError(t, err)
-	require.Equal(t, "email", method.Method)
-
-	svcEmailOff, _ := newTotpVMService(t, user, false)
-	method, err = svcEmailOff.GetVerificationMethod(context.Background(), user.ID)
-	require.NoError(t, err)
-	require.Equal(t, "password", method.Method)
+	return NewTotpService(userRepo, nil, nil, settingSvc), userRepo
 }
 
 func TestTotpDisableAdminUsesPasswordEvenWithEmailVerifyEnabled(t *testing.T) {
@@ -97,11 +75,15 @@ func TestTotpDisableAdminUsesPasswordEvenWithEmailVerifyEnabled(t *testing.T) {
 	require.True(t, userRepo.disableCalled)
 }
 
-func TestTotpDisableRegularUserStillRequiresEmailCode(t *testing.T) {
+func TestTotpDisableRegularUserUsesPassword(t *testing.T) {
 	user := &User{ID: 2, Email: "user@example.com", Role: RoleUser, TotpEnabled: true}
 	require.NoError(t, user.SetPassword("whatever"))
-	svc, _ := newTotpVMService(t, user, true)
+	svc, userRepo := newTotpVMService(t, user, true)
 
-	err := svc.Disable(context.Background(), user.ID, "", "whatever")
-	require.ErrorIs(t, err, ErrVerifyCodeRequired)
+	err := svc.Disable(context.Background(), user.ID, "", "")
+	require.ErrorIs(t, err, ErrPasswordRequired)
+
+	err = svc.Disable(context.Background(), user.ID, "", "whatever")
+	require.NoError(t, err)
+	require.True(t, userRepo.disableCalled)
 }

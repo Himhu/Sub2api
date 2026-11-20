@@ -82,7 +82,7 @@ func newHandlerMCPFixture(t *testing.T) (*MCPOAuthHandler, *handlerMCPRepo, *han
 	users := &handlerMCPUsers{user: &service.User{ID: 7, Role: service.RoleAdmin, Status: service.StatusActive, TotpEnabled: true}}
 	settings := service.NewSettingService(&handlerMCPSettings{values: map[string]string{service.SettingKeyStepUpEnabled: "true"}}, cfg)
 	cache := &handlerMCPCache{}
-	totp := service.NewTotpService(users, nil, cache, settings, nil, nil)
+	totp := service.NewTotpService(users, nil, cache, settings)
 	oauth := service.NewMCPOAuthService(repo, users)
 	client, err := oauth.Register(context.Background(), service.MCPOAuthRegisterInput{ClientName: "Example assistant", RedirectURIs: []string{"https://client.example.com/callback?workspace=one"}})
 	require.NoError(t, err)
@@ -491,4 +491,8 @@ func TestMCPOAuthHandlerBrowserEndpointsRequireSession(t *testing.T) {
 	}
 	require.Zero(t, repo.reads)
 	require.Zero(t, repo.writes)
+}
+
+func boolPtr(v bool) *bool {
+	return &v
 }

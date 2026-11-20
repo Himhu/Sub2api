@@ -156,40 +156,6 @@ func (h *TotpHandler) Disable(c *gin.Context) {
 	response.Success(c, gin.H{"success": true})
 }
 
-// GetVerificationMethod returns the verification method for TOTP operations
-// GET /api/v1/user/totp/verification-method
-func (h *TotpHandler) GetVerificationMethod(c *gin.Context) {
-	subject, ok := middleware2.GetAuthSubjectFromContext(c)
-	if !ok {
-		response.Unauthorized(c, "User not authenticated")
-		return
-	}
-
-	method, err := h.totpService.GetVerificationMethod(c.Request.Context(), subject.UserID)
-	if err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-	response.Success(c, method)
-}
-
-// SendVerifyCode sends an email verification code for TOTP operations
-// POST /api/v1/user/totp/send-code
-func (h *TotpHandler) SendVerifyCode(c *gin.Context) {
-	subject, ok := middleware2.GetAuthSubjectFromContext(c)
-	if !ok {
-		response.Unauthorized(c, "User not authenticated")
-		return
-	}
-
-	if err := h.totpService.SendVerifyCode(c.Request.Context(), subject.UserID, c.GetHeader("Accept-Language")); err != nil {
-		response.ErrorFrom(c, err)
-		return
-	}
-
-	response.Success(c, gin.H{"success": true})
-}
-
 // TotpStepUpRequest represents the request to verify a step-up TOTP code
 type TotpStepUpRequest struct {
 	Code string `json:"code" binding:"required"`

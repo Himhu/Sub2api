@@ -711,7 +711,6 @@ export interface AlertRule {
   sustained_minutes: number
   severity: OpsSeverity
   cooldown_minutes: number
-  notify_email: boolean
   filters?: Record<string, any>
   created_at?: string
   updated_at?: string
@@ -730,33 +729,7 @@ export interface AlertEvent {
   dimensions?: Record<string, any>
   fired_at: string
   resolved_at?: string | null
-  email_sent: boolean
   created_at: string
-}
-
-export interface EmailNotificationConfig {
-  alert: {
-    enabled: boolean
-    recipients: string[]
-    min_severity: AlertSeverity | ''
-    rate_limit_per_hour: number
-    batching_window_seconds: number
-    include_resolved_alerts: boolean
-  }
-  report: {
-    enabled: boolean
-    recipients: string[]
-    daily_summary_enabled: boolean
-    daily_summary_schedule: string
-    weekly_summary_enabled: boolean
-    weekly_summary_schedule: string
-    error_digest_enabled: boolean
-    error_digest_schedule: string
-    error_digest_min_count: number
-    account_health_enabled: boolean
-    account_health_schedule: string
-    account_health_error_rate_threshold: number
-  }
 }
 
 export interface OpsMetricThresholds {
@@ -1207,7 +1180,6 @@ export interface AlertEventsQuery {
   limit?: number
   status?: string
   severity?: string
-  email_sent?: boolean
   time_range?: string
   start_time?: string
   end_time?: string
@@ -1240,17 +1212,6 @@ export async function createAlertSilence(payload: {
   reason?: string
 }): Promise<void> {
   await apiClient.post('/admin/ops/alert-silences', payload)
-}
-
-// Email notification config
-export async function getEmailNotificationConfig(): Promise<EmailNotificationConfig> {
-  const { data } = await apiClient.get<EmailNotificationConfig>('/admin/ops/email-notification/config')
-  return data
-}
-
-export async function updateEmailNotificationConfig(config: EmailNotificationConfig): Promise<EmailNotificationConfig> {
-  const { data } = await apiClient.put<EmailNotificationConfig>('/admin/ops/email-notification/config', config)
-  return data
 }
 
 // Runtime settings (DB-backed)
@@ -1353,8 +1314,6 @@ export const opsAPI = {
   getAlertEvent,
   updateAlertEventStatus,
   createAlertSilence,
-  getEmailNotificationConfig,
-  updateEmailNotificationConfig,
   getAlertRuntimeSettings,
   updateAlertRuntimeSettings,
   getRuntimeLogConfig,

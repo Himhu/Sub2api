@@ -13,7 +13,6 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent"
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/handler"
-	"github.com/Wei-Shaw/sub2api/internal/payment"
 	"github.com/Wei-Shaw/sub2api/internal/repository"
 	"github.com/Wei-Shaw/sub2api/internal/securityaudit"
 	"github.com/Wei-Shaw/sub2api/internal/server"
@@ -40,7 +39,6 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 		repository.ProviderSet,
 		service.ProviderSet,
 		securityaudit.ProviderSet,
-		payment.ProviderSet,
 		middleware.ProviderSet,
 		handler.ProviderSet,
 
@@ -50,8 +48,7 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 		// Privacy client factory for OpenAI training opt-out
 		providePrivacyClientFactory,
 
-		// BuildInfo provider
-		provideServiceBuildInfo,
+		// Plugin host info provider
 		providePluginHostInfo,
 
 		// Cleanup function provider
@@ -65,13 +62,6 @@ func initializeApplication(buildInfo handler.BuildInfo) (*Application, error) {
 
 func providePrivacyClientFactory() service.PrivacyClientFactory {
 	return repository.CreatePrivacyReqClient
-}
-
-func provideServiceBuildInfo(buildInfo handler.BuildInfo) service.BuildInfo {
-	return service.BuildInfo{
-		Version:   buildInfo.Version,
-		BuildType: buildInfo.BuildType,
-	}
 }
 
 func providePluginHostInfo(buildInfo handler.BuildInfo) service.PluginHostInfo {
@@ -88,7 +78,6 @@ func provideCleanup(
 	opsAggregation *service.OpsAggregationService,
 	opsAlertEvaluator *service.OpsAlertEvaluatorService,
 	opsCleanup *service.OpsCleanupService,
-	opsScheduledReport *service.OpsScheduledReportService,
 	opsSystemLogSink *service.OpsSystemLogSink,
 	opsService *service.OpsService,
 	opsIngressReject *service.OpsIngressRejectAggregator,
@@ -101,20 +90,16 @@ func provideCleanup(
 	codexVersionSync *service.OpenAICodexVersionSyncService,
 	claudeCodeVersionSync *service.ClaudeCodeVersionSyncService,
 	proxyExpiry *service.ProxyExpiryService,
-	subscriptionExpiry *service.SubscriptionExpiryService,
 	usageCleanup *service.UsageCleanupService,
 	idempotencyCleanup *service.IdempotencyCleanupService,
 	geminiCachedContent *service.GeminiCachedContentService,
 	batchImageCleanup *service.BatchImageCleanupService,
 	batchImageWorker *service.BatchImageWorkerRuntime,
 	pricing *service.PricingService,
-	emailQueue *service.EmailQueueService,
 	billingCache *service.BillingCacheService,
 	usageRecordWorkerPool *service.UsageRecordWorkerPool,
 	usageBillingLanes *service.UsageBillingLaneCombiner,
-	balanceNotify *service.BalanceNotifyService,
 	digestSessions *service.DigestSessionStore,
-	subscriptionService *service.SubscriptionService,
 	oauth *service.OAuthService,
 	openaiOAuth *service.OpenAIOAuthService,
 	geminiOAuth *service.GeminiOAuthService,
@@ -123,7 +108,6 @@ func provideCleanup(
 	openAIGateway *service.OpenAIGatewayService,
 	scheduledTestRunner *service.ScheduledTestRunnerService,
 	backupSvc *service.BackupService,
-	paymentOrderExpiry *service.PaymentOrderExpiryService,
 	channelMonitorRunner *service.ChannelMonitorRunner,
 	channelMonitorV2Aggregator *service.ChannelMonitorV2Aggregator,
 	quotaFlusher *service.UserPlatformQuotaUsageFlusher,
@@ -149,12 +133,6 @@ func provideCleanup(
 			{"DigestSessionStore", func() error {
 				if digestSessions != nil {
 					digestSessions.Close()
-				}
-				return nil
-			}},
-			{"BalanceNotifyService", func() error {
-				if balanceNotify != nil {
-					balanceNotify.Stop()
 				}
 				return nil
 			}},
@@ -197,12 +175,6 @@ func provideCleanup(
 			{"PromptAuditService", func() error {
 				if promptAudit != nil {
 					return promptAudit.Shutdown(ctx)
-				}
-				return nil
-			}},
-			{"OpsScheduledReportService", func() error {
-				if opsScheduledReport != nil {
-					opsScheduledReport.Stop()
 				}
 				return nil
 			}},
@@ -304,22 +276,8 @@ func provideCleanup(
 				proxyExpiry.Stop()
 				return nil
 			}},
-			{"SubscriptionExpiryService", func() error {
-				subscriptionExpiry.Stop()
-				return nil
-			}},
-			{"SubscriptionService", func() error {
-				if subscriptionService != nil {
-					subscriptionService.Stop()
-				}
-				return nil
-			}},
 			{"PricingService", func() error {
 				pricing.Stop()
-				return nil
-			}},
-			{"EmailQueueService", func() error {
-				emailQueue.Stop()
 				return nil
 			}},
 			{"BillingCacheService", func() error {
@@ -373,12 +331,6 @@ func provideCleanup(
 			{"BackupService", func() error {
 				if backupSvc != nil {
 					backupSvc.Stop()
-				}
-				return nil
-			}},
-			{"PaymentOrderExpiryService", func() error {
-				if paymentOrderExpiry != nil {
-					paymentOrderExpiry.Stop()
 				}
 				return nil
 			}},

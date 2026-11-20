@@ -22,7 +22,6 @@ function createPublicSettings(overrides: Partial<PublicSettings> = {}): PublicSe
     force_email_on_third_party_signup: false,
     registration_email_suffix_whitelist: [],
     promo_code_enabled: true,
-    password_reset_enabled: false,
     invitation_code_enabled: false,
     turnstile_enabled: false,
     turnstile_site_key: '',
@@ -49,9 +48,6 @@ function createPublicSettings(overrides: Partial<PublicSettings> = {}): PublicSe
     google_oauth_enabled: false,
     backend_mode_enabled: false,
     version: '1.0.0',
-    balance_low_notify_enabled: false,
-    account_quota_notify_enabled: false,
-    balance_low_notify_threshold: 0,
     channel_monitor_enabled: true,
     channel_monitor_default_interval_seconds: 60,
     available_channels_enabled: false,
@@ -67,10 +63,6 @@ function createPublicSettings(overrides: Partial<PublicSettings> = {}): PublicSe
 }
 
 // Mock API 模块
-vi.mock('@/api/admin/system', () => ({
-  checkUpdates: vi.fn(),
-}))
-
 vi.mock('@/api/auth', () => ({
   getPublicSettings: vi.fn(),
 }))
@@ -445,7 +437,6 @@ describe('useAppStore', () => {
         email_verify_enabled: false,
         registration_email_suffix_whitelist: [],
         promo_code_enabled: true,
-        password_reset_enabled: false,
         invitation_code_enabled: false,
         turnstile_enabled: false,
         turnstile_site_key: '',
