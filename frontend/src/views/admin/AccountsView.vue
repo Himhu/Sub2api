@@ -301,6 +301,9 @@
               :stats="todayStatsByAccountId[String(row.id)] ?? null"
               :loading="todayStatsLoading"
               :error="todayStatsError"
+              show-rates
+              :rate-multiplier="row.rate_multiplier ?? 1"
+              :site-rate-multiplier="row.user_rate_multiplier ?? null"
             />
           </template>
           <template #cell-groups="{ row }">

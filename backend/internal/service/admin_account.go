@@ -309,6 +309,7 @@ func (s *adminServiceImpl) DuplicateAccount(ctx context.Context, id int64, actor
 		Concurrency:           source.Concurrency,
 		Priority:              source.Priority,
 		RateMultiplier:        cloneAccountValuePointer(source.RateMultiplier),
+		UserRateMultiplier:    cloneAccountValuePointer(source.UserRateMultiplier),
 		LoadFactor:            cloneAccountValuePointer(source.LoadFactor),
 		GroupIDs:              groupIDs,
 		ExpiresAt:             expiresAt,
@@ -468,6 +469,9 @@ func buildAccountForCreate(input *CreateAccountInput, accountExtra map[string]an
 			return nil, errors.New("rate_multiplier must be >= 0")
 		}
 		account.RateMultiplier = input.RateMultiplier
+	}
+	if input.UserRateMultiplier != nil && *input.UserRateMultiplier >= 0 {
+		account.UserRateMultiplier = input.UserRateMultiplier
 	}
 	if input.LoadFactor != nil && *input.LoadFactor > 0 {
 		if *input.LoadFactor > 10000 {
@@ -826,6 +830,13 @@ func (s *adminServiceImpl) UpdateAccount(ctx context.Context, id int64, input *U
 			return nil, ErrUpstreamBillingRateSyncConflict
 		}
 		account.RateMultiplier = input.RateMultiplier
+	}
+	if input.UserRateMultiplier != nil {
+		if *input.UserRateMultiplier < 0 {
+			account.UserRateMultiplier = nil // 负数表示清除，沿用分组倍率
+		} else {
+			account.UserRateMultiplier = input.UserRateMultiplier
+		}
 	}
 	if input.LoadFactor != nil {
 		if *input.LoadFactor <= 0 {

@@ -160,6 +160,9 @@ func createAccountRecord(ctx context.Context, client *dbent.Client, account *ser
 	if account.RateMultiplier != nil {
 		builder.SetRateMultiplier(*account.RateMultiplier)
 	}
+	if account.UserRateMultiplier != nil {
+		builder.SetUserRateMultiplier(*account.UserRateMultiplier)
+	}
 	if account.LoadFactor != nil {
 		builder.SetLoadFactor(*account.LoadFactor)
 	}
@@ -559,6 +562,11 @@ func (r *accountRepository) updateLockedAccount(
 
 	if explicitRateMultiplier != nil {
 		builder.SetRateMultiplier(*explicitRateMultiplier)
+	}
+	if account.UserRateMultiplier != nil {
+		builder.SetUserRateMultiplier(*account.UserRateMultiplier)
+	} else {
+		builder.ClearUserRateMultiplier()
 	}
 	if account.LoadFactor != nil {
 		builder.SetLoadFactor(*account.LoadFactor)
@@ -3767,6 +3775,7 @@ func accountEntityToService(m *dbent.Account) *service.Account {
 		Concurrency:             m.Concurrency,
 		Priority:                m.Priority,
 		RateMultiplier:          &rateMultiplier,
+		UserRateMultiplier:      m.UserRateMultiplier,
 		LoadFactor:              m.LoadFactor,
 		Status:                  m.Status,
 		ErrorMessage:            derefString(m.ErrorMessage),

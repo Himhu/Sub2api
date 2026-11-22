@@ -224,13 +224,15 @@ type Account struct {
 	LoadFactor              *int                           `json:"load_factor,omitempty"`
 	Priority                int                            `json:"priority"`
 	RateMultiplier          float64                        `json:"rate_multiplier"`
-	Status                  string                         `json:"status"`
-	ErrorMessage            string                         `json:"error_message"`
-	LastUsedAt              *time.Time                     `json:"last_used_at"`
-	ExpiresAt               *int64                         `json:"expires_at"`
-	AutoPauseOnExpired      bool                           `json:"auto_pause_on_expired"`
-	CreatedAt               time.Time                      `json:"created_at"`
-	UpdatedAt               time.Time                      `json:"updated_at"`
+	// UserRateMultiplier 线路级本站倍率；null 表示沿用分组倍率。
+	UserRateMultiplier *float64   `json:"user_rate_multiplier"`
+	Status             string     `json:"status"`
+	ErrorMessage       string     `json:"error_message"`
+	LastUsedAt         *time.Time `json:"last_used_at"`
+	ExpiresAt          *int64     `json:"expires_at"`
+	AutoPauseOnExpired bool       `json:"auto_pause_on_expired"`
+	CreatedAt          time.Time  `json:"created_at"`
+	UpdatedAt          time.Time  `json:"updated_at"`
 
 	Schedulable bool `json:"schedulable"`
 

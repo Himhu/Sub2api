@@ -348,6 +348,7 @@ type CreateAccountInput struct {
 	Concurrency        int
 	Priority           int
 	RateMultiplier     *float64 // 账号计费倍率（>=0，允许 0）
+	UserRateMultiplier *float64 // 线路级本站倍率（>=0）；nil 或负数表示沿用分组倍率
 	LoadFactor         *int
 	GroupIDs           []int64
 	ExpiresAt          *int64
@@ -380,6 +381,7 @@ type UpdateAccountInput struct {
 	Concurrency           *int     // 使用指针区分"未提供"和"设置为0"
 	Priority              *int     // 使用指针区分"未提供"和"设置为0"
 	RateMultiplier        *float64 // 账号计费倍率（>=0，允许 0）
+	UserRateMultiplier    *float64 // 线路级本站倍率；nil 表示未提供，负数表示清除（沿用分组倍率）
 	LoadFactor            *int
 	Status                string
 	GroupIDs              *[]int64

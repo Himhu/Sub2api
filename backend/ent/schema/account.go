@@ -113,6 +113,13 @@ func (Account) Fields() []ent.Field {
 			SchemaType(map[string]string{dialect.Postgres: "decimal(10,4)"}).
 			Default(1.0),
 
+		// user_rate_multiplier: 线路级本站倍率（>=0）。非空时该账号上的请求按此倍率向用户扣费；
+		// NULL 表示沿用分组倍率。与 rate_multiplier（上游成本口径）相互独立。
+		field.Float("user_rate_multiplier").
+			SchemaType(map[string]string{dialect.Postgres: "decimal(10,4)"}).
+			Optional().
+			Nillable(),
+
 		// status: 账户状态，如 "active", "error", "disabled"
 		field.String("status").
 			MaxLen(20).

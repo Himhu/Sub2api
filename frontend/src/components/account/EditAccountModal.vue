@@ -2225,6 +2225,19 @@
           </div>
           <p class="input-hint">{{ t('admin.accounts.openai.endpointCapabilitiesDesc') }}</p>
         </div>
+        <div>
+          <label class="input-label">{{ t('admin.accounts.siteRateMultiplier') }}</label>
+          <input
+            v-model.number="form.user_rate_multiplier"
+            type="number"
+            min="0"
+            step="0.001"
+            class="input"
+            data-testid="account-site-rate-multiplier"
+            :placeholder="t('admin.accounts.siteRateMultiplierPlaceholder')"
+          />
+          <p class="input-hint">{{ t('admin.accounts.siteRateMultiplierHint') }}</p>
+        </div>
       </div>
 
       <!-- OpenAI APIKey images: backfill b64_json from url -->
@@ -4477,6 +4490,7 @@ const form = reactive({
   load_factor: null as number | null,
   priority: 1,
   rate_multiplier: 1,
+  user_rate_multiplier: null as number | null,
   status: 'active' as 'active' | 'inactive' | 'error',
   group_ids: [] as number[],
   expires_at: null as number | null
@@ -4585,6 +4599,7 @@ const syncFormFromAccount = (newAccount: Account | null) => {
   form.load_factor = newAccount.load_factor ?? null
   form.priority = newAccount.priority
   form.rate_multiplier = newAccount.rate_multiplier ?? 1
+  form.user_rate_multiplier = newAccount.user_rate_multiplier ?? null
   form.status = (newAccount.status === 'active' || newAccount.status === 'inactive' || newAccount.status === 'error')
     ? newAccount.status
     : 'active'
@@ -5628,6 +5643,10 @@ const handleSubmit = async () => {
     if (updatePayload.proxy_id === null) {
       updatePayload.proxy_id = 0
     }
+    // 本站倍率：留空表示沿用分组倍率；后端约定负数为“清除”。
+    const siteRate = form.user_rate_multiplier
+    updatePayload.user_rate_multiplier =
+      typeof siteRate === 'number' && Number.isFinite(siteRate) && siteRate >= 0 ? siteRate : -1
     if (form.expires_at === null) {
       updatePayload.expires_at = 0
     }
