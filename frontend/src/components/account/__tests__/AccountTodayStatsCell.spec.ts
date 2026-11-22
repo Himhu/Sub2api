@@ -20,14 +20,40 @@ describe('AccountTodayStatsCell', () => {
     expect(wrapper.get('[data-testid="today-stats-site-rate"]').text()).toBe('×1.2')
   })
 
-  it('labels the site rate as following the group when the account has none', () => {
+  it('shows the actual group multiplier when the account has no site multiplier', () => {
+    const wrapper = mount(AccountTodayStatsCell, {
+      props: {
+        stats,
+        showRates: true,
+        rateMultiplier: 1,
+        siteRateMultiplier: null,
+        groupRateMultipliers: [2],
+      },
+    })
+    expect(wrapper.get('[data-testid="today-stats-upstream-rate"]').text()).toBe('×1')
+    const siteRate = wrapper.get('[data-testid="today-stats-site-rate"]')
+    expect(siteRate.text()).toBe('×2')
+    expect(siteRate.attributes('title')).toBe('admin.accounts.siteRateMultiplierFollowGroup')
+  })
+
+  it('lists each distinct group multiplier when the account spans groups with different rates', () => {
+    const wrapper = mount(AccountTodayStatsCell, {
+      props: {
+        stats,
+        showRates: true,
+        rateMultiplier: 1,
+        siteRateMultiplier: null,
+        groupRateMultipliers: [2, 1.5, 2],
+      },
+    })
+    expect(wrapper.get('[data-testid="today-stats-site-rate"]').text()).toBe('×1.5 / ×2')
+  })
+
+  it('falls back to ×1 when the account belongs to no group', () => {
     const wrapper = mount(AccountTodayStatsCell, {
       props: { stats, showRates: true, rateMultiplier: 1, siteRateMultiplier: null },
     })
-    expect(wrapper.get('[data-testid="today-stats-upstream-rate"]').text()).toBe('×1')
-    expect(wrapper.get('[data-testid="today-stats-site-rate"]').text()).toBe(
-      'admin.accounts.siteRateMultiplierFollowGroup',
-    )
+    expect(wrapper.get('[data-testid="today-stats-site-rate"]').text()).toBe('×1')
   })
 
   it('keeps a zero site multiplier (free line) distinct from "follow the group"', () => {

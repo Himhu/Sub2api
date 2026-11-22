@@ -1163,7 +1163,7 @@ export default {
       siteRateMultiplier: 'Site Rate Multiplier',
       siteRateMultiplierHint: 'Multiplier used to charge users; leave empty to follow the group multiplier',
       siteRateMultiplierPlaceholder: 'Empty = group multiplier',
-      siteRateMultiplierFollowGroup: 'group rate',
+      siteRateMultiplierFollowGroup: 'No site multiplier set; charged at the group rate',
       expiresAt: 'Expires At',
       expiresAtHint: 'Leave empty for no expiration',
       expiresAtTimezoneHint: 'Input is interpreted in your browser time zone ({timezone}).',

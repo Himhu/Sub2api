@@ -1275,7 +1275,7 @@ export default {
       siteRateMultiplier: '本站倍率',
       siteRateMultiplierHint: '向用户扣费的倍率；留空则沿用分组倍率',
       siteRateMultiplierPlaceholder: '留空 = 分组倍率',
-      siteRateMultiplierFollowGroup: '分组倍率',
+      siteRateMultiplierFollowGroup: '未设置本站倍率，按所属分组倍率扣费',
       expiresAt: '过期时间',
       expiresAtHint: '留空表示不过期',
       expiresAtTimezoneHint: '输入按浏览器本地时区（{timezone}）解释。',

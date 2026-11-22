@@ -304,6 +304,7 @@
               show-rates
               :rate-multiplier="row.rate_multiplier ?? 1"
               :site-rate-multiplier="row.user_rate_multiplier ?? null"
+              :group-rate-multipliers="accountGroupsForRow(row).map(group => group.rate_multiplier)"
             />
           </template>
           <template #cell-groups="{ row }">

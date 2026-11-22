@@ -55,6 +55,7 @@
           v-if="props.showRates"
           class="text-gray-400 dark:text-gray-500"
           data-testid="today-stats-site-rate"
+          :title="siteRateTitle || undefined"
           >{{ siteRateLabel }}</span
         >
       </div>
@@ -80,6 +81,8 @@ const props = withDefaults(
     showRates?: boolean
     rateMultiplier?: number | null
     siteRateMultiplier?: number | null
+    // 线路所属分组的倍率；本站倍率未填写时按这些分组倍率扣费
+    groupRateMultipliers?: number[]
   }>(),
   {
     stats: null,
@@ -87,7 +90,8 @@ const props = withDefaults(
     error: null,
     showRates: false,
     rateMultiplier: null,
-    siteRateMultiplier: null
+    siteRateMultiplier: null,
+    groupRateMultipliers: () => []
   }
 )
 
@@ -101,11 +105,25 @@ const upstreamRateLabel = computed(() => {
   return formatRate(props.rateMultiplier)
 })
 
-// 本站倍率：未填写时扣费沿用分组倍率
-const siteRateLabel = computed(() =>
-  props.siteRateMultiplier != null && props.siteRateMultiplier >= 0
-    ? formatRate(props.siteRateMultiplier)
-    : t('admin.accounts.siteRateMultiplierFollowGroup')
+const hasSiteRate = computed(
+  () => props.siteRateMultiplier != null && props.siteRateMultiplier >= 0
+)
+
+// 本站倍率：未填写时扣费沿用分组倍率，直接列出所属分组的实际倍率
+// （多个分组倍率不同则全部列出；未归属分组时后端按 1 计费）。
+const siteRateLabel = computed(() => {
+  if (hasSiteRate.value) return formatRate(props.siteRateMultiplier as number)
+  const rates = [...new Set(props.groupRateMultipliers.filter(rate => Number.isFinite(rate)))]
+  if (rates.length === 0) return formatRate(1)
+  return rates
+    .sort((a, b) => a - b)
+    .map(formatRate)
+    .join(' / ')
+})
+
+// 鼠标悬停时说明该倍率来自分组而非线路自身
+const siteRateTitle = computed(() =>
+  hasSiteRate.value ? '' : t('admin.accounts.siteRateMultiplierFollowGroup')
 )
 
 // Format large token numbers (e.g., 1234567 -> 1.23M)
