@@ -597,6 +597,16 @@ gateway:
     # 负载感知选择时优先用尽「会话窗口最早重置」的账号；false 保持
     # 原有「优先级 → 负载率 → LRU」行为（默认）。
     prefer_soonest_reset: false
+    # Prefer cheaper accounts (lower billing rate multiplier) among equal-priority
+    # candidates, guarded by first-token latency: a cheaper account is demoted
+    # when its TTFT EWMA is slower than the fastest candidate by more than both
+    # cost_ttft_guard_abs_ms AND cost_ttft_guard_ratio.
+    # 同优先级账号先按「账号计费倍率」从低到高选，便宜线路优先；首字耗时守门：
+    # 便宜线路比最快线路慢超过 cost_ttft_guard_abs_ms 且慢超过 cost_ttft_guard_ratio
+    # 时降档。false 保持原有行为（默认）。
+    prefer_lower_cost: false
+    cost_ttft_guard_abs_ms: 800
+    cost_ttft_guard_ratio: 0.5
     # Enable batch load calculation for scheduling
     # 启用调度批量负载计算
     load_batch_enabled: true

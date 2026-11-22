@@ -883,6 +883,8 @@ type GatewayService struct {
 	debugGatewayBodyFile  atomic.Pointer[os.File] // non-nil when SUB2API_DEBUG_GATEWAY_BODY is set
 	tlsFPProfileService   *TLSFingerprintProfileService
 	userPlatformQuotaRepo UserPlatformQuotaRepository
+	// ttftStats 每账号首字耗时 EWMA，供成本优先调度的首字守门使用。
+	ttftStats *accountTTFTStats
 }
 
 // NewGatewayService creates a new GatewayService
@@ -948,6 +950,7 @@ func NewGatewayService(
 		resolver:              resolver,
 		compositeResolver:     compositeResolver,
 		userPlatformQuotaRepo: userPlatformQuotaRepo,
+		ttftStats:             newAccountTTFTStats(),
 	}
 	if compositeResolver != nil {
 		compositeResolver.SetModelOwnershipResolver(svc.resolveCompositeModelOwnership)

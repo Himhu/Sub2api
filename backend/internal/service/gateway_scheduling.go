@@ -735,13 +735,17 @@ func (s *GatewayService) SelectAccountWithLoadAwareness(ctx context.Context, gro
 			}
 		}
 
-		// 分层过滤选择：优先级 →（可选）最早重置 → 负载率 → LRU
+		// 分层过滤选择：优先级 →（可选）最早重置 →（可选）成本优先+首字守门 → 负载率 → LRU
 		for len(available) > 0 {
 			// 1. 取优先级最小的集合
 			candidates := filterByMinPriority(available)
 			// 2. （可选）use-it-or-lose-it：优先选用会话窗口最早重置的账号
 			if cfg.PreferSoonestReset {
 				candidates = filterBySoonestReset(candidates)
+			}
+			// 2b. （可选）成本优先：取账号计费倍率最低、且首字耗时未被守门拦下的档
+			if cfg.PreferLowerCost {
+				candidates = filterByLowestCost(candidates, s.ttftStats, cfg)
 			}
 			// 3. 取负载率最低的集合
 			candidates = filterByMinLoadRate(candidates)

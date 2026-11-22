@@ -1260,6 +1260,16 @@ type GatewaySchedulingConfig struct {
 	// 默认 false，保持原有「优先级 → 负载率 → LRU」行为不变。
 	PreferSoonestReset bool `mapstructure:"prefer_soonest_reset"`
 
+	// PreferLowerCost 开启后，同优先级的账号先按「账号计费倍率」从低到高分档，
+	// 便宜的线路优先被调度；再由首字耗时守门：一条便宜线路的首字 EWMA 比本轮
+	// 候选中最快的线路慢超过 CostTTFTGuardAbsMS 且慢超过 CostTTFTGuardRatio
+	// 时，降到下一个成本档之后。默认 false，保持原有「优先级 → 负载率 → LRU」行为。
+	PreferLowerCost bool `mapstructure:"prefer_lower_cost"`
+	// CostTTFTGuardAbsMS 首字守门的绝对阈值（毫秒），<=0 表示禁用守门、纯按成本排。
+	CostTTFTGuardAbsMS int `mapstructure:"cost_ttft_guard_abs_ms"`
+	// CostTTFTGuardRatio 首字守门的相对阈值（比最快线路慢的比例，0.5 = 慢 50%）。
+	CostTTFTGuardRatio float64 `mapstructure:"cost_ttft_guard_ratio"`
+
 	// 负载计算
 	LoadBatchEnabled    bool `mapstructure:"load_batch_enabled"`
 	LoadBatchCacheTTLMS int  `mapstructure:"load_batch_cache_ttl_ms"`
@@ -2226,6 +2236,9 @@ func setDefaults() {
 	viper.SetDefault("gateway.scheduling.fallback_max_waiting", 100)
 	viper.SetDefault("gateway.scheduling.fallback_selection_mode", "last_used")
 	viper.SetDefault("gateway.scheduling.prefer_soonest_reset", false)
+	viper.SetDefault("gateway.scheduling.prefer_lower_cost", false)
+	viper.SetDefault("gateway.scheduling.cost_ttft_guard_abs_ms", 800)
+	viper.SetDefault("gateway.scheduling.cost_ttft_guard_ratio", 0.5)
 	viper.SetDefault("gateway.scheduling.load_batch_enabled", true)
 	viper.SetDefault("gateway.scheduling.load_batch_cache_ttl_ms", 200)
 	viper.SetDefault("gateway.scheduling.snapshot_mget_chunk_size", 128)

@@ -679,6 +679,10 @@ func (s *GatewayService) recordUsageCore(ctx context.Context, input *recordUsage
 	apiKey := input.APIKey
 	user := input.User
 	account := input.Account
+	// 成本优先调度的首字守门依赖每账号的首字耗时 EWMA，在这里统一喂入样本。
+	if account != nil && result != nil {
+		s.ttftStats.report(account.ID, result.FirstTokenMs)
+	}
 	ApplyForwardImageBillingResolution(result)
 	logServiceTierBillingDowngrade("service.gateway", account, result.RequestID, ApplyForwardServiceTierBillingResolution(result))
 

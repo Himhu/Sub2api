@@ -873,6 +873,27 @@ func TestLoadSchedulingConfigFromEnv(t *testing.T) {
 	}
 }
 
+func TestLoadCostSchedulingConfig(t *testing.T) {
+	resetViperWithJWTSecret(t)
+
+	cfg, err := Load()
+	require.NoError(t, err)
+	require.False(t, cfg.Gateway.Scheduling.PreferLowerCost, "cost-first scheduling is opt-in")
+	require.Equal(t, 800, cfg.Gateway.Scheduling.CostTTFTGuardAbsMS)
+	require.InDelta(t, 0.5, cfg.Gateway.Scheduling.CostTTFTGuardRatio, 1e-9)
+
+	resetViperWithJWTSecret(t)
+	t.Setenv("GATEWAY_SCHEDULING_PREFER_LOWER_COST", "true")
+	t.Setenv("GATEWAY_SCHEDULING_COST_TTFT_GUARD_ABS_MS", "1200")
+	t.Setenv("GATEWAY_SCHEDULING_COST_TTFT_GUARD_RATIO", "0.3")
+
+	cfg, err = Load()
+	require.NoError(t, err)
+	require.True(t, cfg.Gateway.Scheduling.PreferLowerCost)
+	require.Equal(t, 1200, cfg.Gateway.Scheduling.CostTTFTGuardAbsMS)
+	require.InDelta(t, 0.3, cfg.Gateway.Scheduling.CostTTFTGuardRatio, 1e-9)
+}
+
 func TestLoadForcedCodexInstructionsTemplate(t *testing.T) {
 	resetViperWithJWTSecret(t)
 
