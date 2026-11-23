@@ -1079,8 +1079,10 @@ func (s *OpenAIGatewayService) selectBestAccount(ctx context.Context, groupID *i
 	if len(eligible) == 0 {
 		return nil, compactBlocked, filterStats
 	}
+	cfg := s.schedulingConfig()
 	rateOrder := openAILegacyUpstreamRateOrder{}
-	if preferLowUpstreamRate {
+	// 成本优先+首字守门开启时取代旧的「低上游倍率优先」排序。
+	if preferLowUpstreamRate && !cfg.PreferLowerCost {
 		rateOrder = newOpenAILegacyUpstreamRateOrder(eligible, time.Now(), s.openAIOAuthSchedulingRateMultiplier(ctx))
 	}
 	sort.SliceStable(eligible, func(i, j int) bool {
@@ -1093,6 +1095,19 @@ func (s *OpenAIGatewayService) selectBestAccount(ctx context.Context, groupID *i
 		}
 		return s.isBetterAccount(a, b)
 	})
+	if cfg.PreferLowerCost {
+		// 在每个 compact 档内按「优先级 → 成本档（含首字守门）→ LRU」重排。
+		ordered := make([]*Account, 0, len(eligible))
+		for i := 0; i < len(eligible); {
+			j := i + 1
+			for j < len(eligible) && compactTiers[eligible[j].ID] == compactTiers[eligible[i].ID] {
+				j++
+			}
+			ordered = append(ordered, orderAccountsByLowestCost(eligible[i:j], s.ttftStats, cfg)...)
+			i = j
+		}
+		eligible = ordered
+	}
 	return eligible[0], compactBlocked, filterStats
 }
 
@@ -1311,7 +1326,9 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 		return nil, noAvailableOpenAISelectionError(requestedModel, false, filterStats.summary(""))
 	}
 	rateOrder := openAILegacyUpstreamRateOrder{}
-	if preferLowUpstreamRate {
+	// 成本优先+首字守门开启时取代旧的「低上游倍率优先」排序，避免两套成本排序互相覆盖。
+	preferLowerCost := cfg.PreferLowerCost
+	if preferLowUpstreamRate && !preferLowerCost {
 		rateOrder = newOpenAILegacyUpstreamRateOrder(candidates, time.Now(), s.openAIOAuthSchedulingRateMultiplier(ctx))
 	}
 
@@ -1366,6 +1383,10 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 			sort.SliceStable(available, func(i, j int) bool {
 				return rateOrder.compare(available[i].account, available[j].account) < 0
 			})
+		}
+		if preferLowerCost {
+			// 优先级 → 成本档（含首字守门）→ 负载率 → LRU
+			available = orderByLowestCost(available, s.ttftStats, cfg)
 		}
 
 		selectionOrder := make([]accountWithLoad, 0, len(available))
@@ -1423,6 +1444,9 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 				return rateOrder.compare(ordered[i], ordered[j]) < 0
 			})
 		}
+		if preferLowerCost {
+			ordered = orderAccountsByLowestCost(ordered, s.ttftStats, cfg)
+		}
 		if requireCompact {
 			ordered = prioritizeOpenAICompactAccounts(ordered)
 		}
@@ -1472,6 +1496,9 @@ func (s *OpenAIGatewayService) selectAccountWithLoadAwareness(ctx context.Contex
 		sort.SliceStable(candidates, func(i, j int) bool {
 			return rateOrder.compare(candidates[i], candidates[j]) < 0
 		})
+	}
+	if preferLowerCost {
+		candidates = orderAccountsByLowestCost(candidates, s.ttftStats, cfg)
 	}
 	if requireCompact {
 		candidates = prioritizeOpenAICompactAccounts(candidates)

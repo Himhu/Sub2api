@@ -478,19 +478,21 @@ type OpenAIGatewayService struct {
 	liveAttestation       liveattestation.Provider
 	liveAttestationCipher SecretEncryptor
 
-	openaiWSPoolOnce               sync.Once
-	openaiWSStateStoreOnce         sync.Once
-	openaiSchedulerOnce            sync.Once
-	openaiProxyStreamCircuitOnce   sync.Once
-	openaiWSPassthroughDialerOnce  sync.Once
-	openaiModelTransientOnce       sync.Once
-	agentIdentityTaskMu            sync.Mutex
-	openaiWSPool                   *openAIWSConnPool
-	openaiWSStateStore             OpenAIWSStateStore
-	openaiScheduler                OpenAIAccountScheduler
-	openaiWSPassthroughDialer      openAIWSClientDialer
-	openaiWSSessionPreemptions     openAIWSSessionPreemptRegistry
-	openaiAccountStats             *openAIAccountRuntimeStats
+	openaiWSPoolOnce              sync.Once
+	openaiWSStateStoreOnce        sync.Once
+	openaiSchedulerOnce           sync.Once
+	openaiProxyStreamCircuitOnce  sync.Once
+	openaiWSPassthroughDialerOnce sync.Once
+	openaiModelTransientOnce      sync.Once
+	agentIdentityTaskMu           sync.Mutex
+	openaiWSPool                  *openAIWSConnPool
+	openaiWSStateStore            OpenAIWSStateStore
+	openaiScheduler               OpenAIAccountScheduler
+	openaiWSPassthroughDialer     openAIWSClientDialer
+	openaiWSSessionPreemptions    openAIWSSessionPreemptRegistry
+	openaiAccountStats            *openAIAccountRuntimeStats
+	// ttftStats 为成本优先调度的首字守门提供每账号首字耗时 EWMA（与 GatewayService 共用）。
+	ttftStats                      *accountTTFTStats
 	openaiModelTransient           *openAIAccountModelTransientState
 	openaiProxyStreamCircuit       *openAIProxyStreamCircuit
 	openaiProxyStreamFailOpenLogAt atomic.Int64
@@ -546,6 +548,7 @@ func NewOpenAIGatewayService(
 		SetCodexIdentityEnforcementEnabled(!cfg.Gateway.DisableCodexIdentityEnforcement)
 	}
 	svc := &OpenAIGatewayService{
+		ttftStats:           sharedAccountTTFTStats,
 		accountRepo:         accountRepo,
 		usageLogRepo:        usageLogRepo,
 		usageBillingRepo:    usageBillingRepo,

@@ -950,7 +950,7 @@ func NewGatewayService(
 		resolver:              resolver,
 		compositeResolver:     compositeResolver,
 		userPlatformQuotaRepo: userPlatformQuotaRepo,
-		ttftStats:             newAccountTTFTStats(),
+		ttftStats:             sharedAccountTTFTStats,
 	}
 	if compositeResolver != nil {
 		compositeResolver.SetModelOwnershipResolver(svc.resolveCompositeModelOwnership)

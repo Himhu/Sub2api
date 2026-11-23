@@ -121,6 +121,11 @@ func filterByLowestCost(accounts []accountWithLoad, stats *accountTTFTStats, cfg
 	if len(accounts) <= 1 {
 		return accounts
 	}
+	// 成本比较只在同一优先级内进行：高优先级的账号即使更贵，也不能被低优先级的便宜账号挤掉。
+	accounts = filterByMinPriority(accounts)
+	if len(accounts) <= 1 {
+		return accounts
+	}
 
 	type sample struct {
 		acc     accountWithLoad
@@ -161,4 +166,80 @@ func filterByLowestCost(accounts []accountWithLoad, stats *accountTTFTStats, cfg
 		i = j
 	}
 	return accounts
+}
+
+// sharedAccountTTFTStats 由 Anthropic/Gemini 网关和 OpenAI 网关共用，
+// 账号 ID 全局唯一，任一网关记录的首字耗时都能被另一侧调度看到。
+var sharedAccountTTFTStats = newAccountTTFTStats()
+
+// orderByLowestCost 把候选重排成「优先级 → 成本档（含首字守门）→ 原有顺序」，
+// 供按列表顺序逐个尝试抢槽的调度路径使用（OpenAI 网关）。
+// 不要求输入已按优先级排好：按优先级数值从小到大逐组处理，组内反复取出
+// 当前最优成本档并保持其内部原有顺序，直到组内账号全部排完。
+func orderByLowestCost(accounts []accountWithLoad, stats *accountTTFTStats, cfg config.GatewaySchedulingConfig) []accountWithLoad {
+	if len(accounts) <= 1 {
+		return accounts
+	}
+	priorities := make([]int, 0, len(accounts))
+	seen := make(map[int]struct{}, len(accounts))
+	for _, acc := range accounts {
+		if _, ok := seen[acc.account.Priority]; ok {
+			continue
+		}
+		seen[acc.account.Priority] = struct{}{}
+		priorities = append(priorities, acc.account.Priority)
+	}
+	sort.Ints(priorities)
+
+	ordered := make([]accountWithLoad, 0, len(accounts))
+	for _, priority := range priorities {
+		remaining := make([]accountWithLoad, 0, len(accounts))
+		for _, acc := range accounts {
+			if acc.account.Priority == priority {
+				remaining = append(remaining, acc)
+			}
+		}
+		for len(remaining) > 0 {
+			tier := filterByLowestCost(remaining, stats, cfg)
+			if len(tier) == 0 || len(tier) == len(remaining) {
+				ordered = append(ordered, remaining...)
+				break
+			}
+			picked := make(map[int64]struct{}, len(tier))
+			for _, acc := range tier {
+				picked[acc.account.ID] = struct{}{}
+			}
+			next := make([]accountWithLoad, 0, len(remaining)-len(tier))
+			for _, acc := range remaining {
+				if _, ok := picked[acc.account.ID]; ok {
+					ordered = append(ordered, acc)
+				} else {
+					next = append(next, acc)
+				}
+			}
+			remaining = next
+		}
+	}
+	return ordered
+}
+
+// orderAccountsByLowestCost 是 orderByLowestCost 的 []*Account 版本，
+// 用于没有负载信息的兜底路径（负载查询失败 / 排队等待）。
+func orderAccountsByLowestCost(accounts []*Account, stats *accountTTFTStats, cfg config.GatewaySchedulingConfig) []*Account {
+	if len(accounts) <= 1 {
+		return accounts
+	}
+	wrapped := make([]accountWithLoad, 0, len(accounts))
+	for _, acc := range accounts {
+		if acc == nil {
+			continue
+		}
+		wrapped = append(wrapped, accountWithLoad{account: acc, loadInfo: &AccountLoadInfo{AccountID: acc.ID}})
+	}
+	wrapped = orderByLowestCost(wrapped, stats, cfg)
+	out := make([]*Account, 0, len(wrapped))
+	for _, acc := range wrapped {
+		out = append(out, acc.account)
+	}
+	return out
 }

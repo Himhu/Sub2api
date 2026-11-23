@@ -168,3 +168,39 @@ func TestFilterByLowestCost_NilStats(t *testing.T) {
 	accounts := []accountWithLoad{costTestAccount(1, 1.0), costTestAccount(2, 0.45)}
 	require.Equal(t, []int64{2}, costTestIDs(filterByLowestCost(accounts, nil, costTestConfig())))
 }
+
+func costTestAccountWithPriority(id int64, rate float64, priority int) accountWithLoad {
+	acc := costTestAccount(id, rate)
+	acc.account.Priority = priority
+	return acc
+}
+
+func TestOrderByLowestCost_PriorityGroupsThenCostTiers(t *testing.T) {
+	stats := newAccountTTFTStats()
+	stats.report(11, costTestMs(300))
+	stats.report(12, costTestMs(2500)) // 便宜但慢，被守门降档
+	accounts := []accountWithLoad{
+		costTestAccountWithPriority(11, 1.0, 1),
+		costTestAccountWithPriority(12, 0.45, 1),
+		costTestAccountWithPriority(21, 0.3, 2), // 更便宜，但优先级更低，必须留在后面
+		costTestAccountWithPriority(13, 0.8, 1),
+	}
+	got := costTestIDs(orderByLowestCost(accounts, stats, costTestConfig()))
+	require.Equal(t, []int64{13, 11, 12, 21}, got, "priority 1 first, within it the guarded cheap tier falls behind, priority 2 stays last")
+}
+
+func TestOrderByLowestCost_KeepsRelativeOrderWithinTier(t *testing.T) {
+	accounts := []accountWithLoad{
+		costTestAccount(3, 0.5),
+		costTestAccount(1, 0.5),
+		costTestAccount(2, 1.0),
+	}
+	require.Equal(t, []int64{3, 1, 2}, costTestIDs(orderByLowestCost(accounts, newAccountTTFTStats(), costTestConfig())),
+		"the cheaper tier keeps the incoming (load/LRU) order")
+}
+
+func TestOrderAccountsByLowestCost_NilEntries(t *testing.T) {
+	accounts := []*Account{nil, costTestAccount(2, 1.0).account, costTestAccount(1, 0.4).account}
+	got := orderAccountsByLowestCost(accounts, newAccountTTFTStats(), costTestConfig())
+	require.Equal(t, []int64{1, 2}, []int64{got[0].ID, got[1].ID})
+}

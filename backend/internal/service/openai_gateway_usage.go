@@ -185,6 +185,10 @@ func (s *OpenAIGatewayService) RecordUsage(ctx context.Context, input *OpenAIRec
 	apiKey := input.APIKey
 	user := input.User
 	account := input.Account
+	// 成本优先调度的首字守门依赖每账号的首字耗时 EWMA，在这里统一喂入样本。
+	if account != nil {
+		s.ttftStats.report(account.ID, result.FirstTokenMs)
+	}
 	billingAccount, err := resolveCredentialAccount(ctx, s.accountRepo, account)
 	if err != nil {
 		return err

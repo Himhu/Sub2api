@@ -67,6 +67,8 @@ type GeminiMessagesCompatService struct {
 	antigravityGatewayService *AntigravityGatewayService
 	cfg                       *config.Config
 	responseHeaderFilter      *responseheaders.CompiledHeaderFilter
+	// ttftStats 为成本优先调度的首字守门提供每账号首字耗时 EWMA（与其他网关共用）。
+	ttftStats *accountTTFTStats
 }
 
 func (s *GeminiMessagesCompatService) readUpstreamErrorBody(resp *http.Response) []byte {
@@ -103,6 +105,7 @@ func NewGeminiMessagesCompatService(
 		antigravityGatewayService: antigravityGatewayService,
 		cfg:                       cfg,
 		responseHeaderFilter:      compileResponseHeaderFilter(cfg),
+		ttftStats:                 sharedAccountTTFTStats,
 	}
 }
 
@@ -147,6 +150,7 @@ func (s *GeminiMessagesCompatService) SelectAccountForModelWithExclusions(ctx co
 
 	// 4. 按优先级 + LRU 选择最佳账号
 	// Select best account by priority + LRU
+	accounts = s.applyGeminiCostScheduling(ctx, accounts, excludedIDs, platform, useMixedScheduling, requestedModel)
 	selected := s.selectBestGeminiAccount(ctx, accounts, requestedModel, excludedIDs, platform, useMixedScheduling)
 
 	if selected == nil {
@@ -163,6 +167,50 @@ func (s *GeminiMessagesCompatService) SelectAccountForModelWithExclusions(ctx co
 	}
 
 	return s.hydrateSelectedAccount(ctx, selected)
+}
+
+// applyGeminiCostScheduling 在成本优先调度开启时，把候选收窄到
+// 「同优先级中成本最低且首字耗时未被守门拦下」的一档，规则与 Anthropic、
+// OpenAI 网关共用（gateway.scheduling.prefer_lower_cost）。
+// 这里没有负载率信息，同档内的最终选择仍由 selectBestGeminiAccount 按 LRU 完成。
+func (s *GeminiMessagesCompatService) applyGeminiCostScheduling(
+	ctx context.Context,
+	accounts []Account,
+	excludedIDs map[int64]struct{},
+	platform string,
+	useMixedScheduling bool,
+	requestedModel string,
+) []Account {
+	if s == nil || s.cfg == nil || !s.cfg.Gateway.Scheduling.PreferLowerCost || len(accounts) <= 1 {
+		return accounts
+	}
+	precheckResult := s.buildPreCheckUsageResultMap(ctx, accounts, requestedModel)
+	wrapped := make([]accountWithLoad, 0, len(accounts))
+	for i := range accounts {
+		acc := &accounts[i]
+		if _, excluded := excludedIDs[acc.ID]; excluded {
+			continue
+		}
+		if !s.isAccountUsableForRequestWithPrecheck(ctx, acc, requestedModel, platform, useMixedScheduling, precheckResult) {
+			continue
+		}
+		wrapped = append(wrapped, accountWithLoad{account: acc, loadInfo: &AccountLoadInfo{AccountID: acc.ID}})
+	}
+	if len(wrapped) <= 1 {
+		return accounts
+	}
+	tier := filterByLowestCost(filterByMinPriority(wrapped), s.ttftStats, s.cfg.Gateway.Scheduling)
+	keep := make(map[int64]struct{}, len(tier))
+	for _, acc := range tier {
+		keep[acc.account.ID] = struct{}{}
+	}
+	filtered := make([]Account, 0, len(tier))
+	for i := range accounts {
+		if _, ok := keep[accounts[i].ID]; ok {
+			filtered = append(filtered, accounts[i])
+		}
+	}
+	return filtered
 }
 
 // resolvePlatformAndSchedulingMode 解析目标平台和调度模式。
