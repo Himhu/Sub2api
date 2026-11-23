@@ -166,11 +166,6 @@ WHERE ns.nspname = 'public'
 	require.NoError(t, tx.QueryRowContext(context.Background(), "SELECT to_regclass('public.user_allowed_groups')").Scan(&uagRegclass))
 	require.True(t, uagRegclass.Valid, "expected user_allowed_groups table to exist")
 
-	// orphan_allowed_groups_audit table should exist (migration 013)
-	var orphanAuditRegclass sql.NullString
-	require.NoError(t, tx.QueryRowContext(context.Background(), "SELECT to_regclass('public.orphan_allowed_groups_audit')").Scan(&orphanAuditRegclass))
-	require.True(t, orphanAuditRegclass.Valid, "expected orphan_allowed_groups_audit table to exist")
-
 	// account_groups: created_at should be timestamptz
 	requireColumn(t, tx, "account_groups", "created_at", "timestamp with time zone", 0, false)
 
@@ -202,6 +197,8 @@ func TestMigrationsRunner_AuthIdentityAndPaymentSchemaStayAligned(t *testing.T) 
 		"user_affiliates", "user_affiliate_ledger", "auth_identities", "auth_identity_channels",
 		"auth_identity_migration_reports", "identity_adoption_decisions", "pending_auth_sessions",
 		"user_provider_default_grants", "user_attribute_definitions", "user_attribute_values",
+		// 255_drop_dead_settings_and_tables.sql
+		"billing_usage_entries", "deleted_api_key_audits", "orphan_allowed_groups_audit", "groups_video_price_backup_220",
 	} {
 		var regclass sql.NullString
 		require.NoError(t, tx.QueryRowContext(context.Background(), "SELECT to_regclass('public."+table+"')").Scan(&regclass))
